@@ -3,13 +3,12 @@ import time
 import os
 import requests
 import logging
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
 class BlockSync(object):
-    """두 파일간의 diff만을 동기화"""
+    """동기화가 필요한 두 파일간의 diff만을 동기화"""
     SAME = b"0"
     DIFF = b"1"
     COMPLEN = len(SAME)
@@ -32,13 +31,13 @@ class BlockSync(object):
         return os.posix_fadvise(file_obj.fileno(), offset, length, advice)
 
     @staticmethod
-    def do_create(f: str, size: int):
+    def do_create(path: str, size: int):
         """
-        :param f: file path
+        :param path: file path
         :param size: file size
         """
-        with open(f, 'a', os.SEEK_SET) as __f:
-            __f.truncate(size)
+        with open(path, 'a', os.SEEK_SET) as f:
+            f.truncate(size)
 
     def do_open(self, f: str, mode: str) -> tuple:
         """
@@ -125,11 +124,27 @@ class BlockSync(object):
             self.socket_ = socket_
 
         self.socket_, addr = socket_.accept()
-        dest_dev = Path(str(self.recv_all().strip()))
-        size_blocks = int(self.recv_all().strip())
+        dest = str(self.recv_all().strip())
+        create = int(self.recv_all().strip())
 
-        if size_blocks > 0 and not dest_dev.exists():
-            self.do_create(dest_dev, size_blocks)
+        if create > 0:
+            self.do_create(dest, create)
+
+        dest_dev, dest_size = self.do_open(dest, 'rb+')
+        """수신 서버의 파일 크기 전달하여 같은 크기의 파일인지 검사
+        송신 서버에서 크기가 다를 시 socket 닫음
+        """
+        self.socket_.sendall(str(dest_size).encode())
+        block_size = int(self.recv_all())
+
+        for block in self.get_blocks(dest_dev, block_size):
+            self.socket_.sendall(block)
+            res = self.socket_.recv(self.COMPLEN)
+
+            if res == self.DIFF:
+                new_block = self.socket_.recv(block_size)
+                dest_dev.seek(-block_size)
+                dest_dev.write(new_block)
 
     def sync(self, server: str, src_dev: str, dest_dev: str, **kwargs):
         """
