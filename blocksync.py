@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 class BlockSync(object):
     """동기화가 필요한 두 파일간의 diff만을 동기화"""
+
     SAME = b"0"
     DIFF = b"1"
     COMPLEN = len(SAME)
@@ -36,7 +37,7 @@ class BlockSync(object):
         :param path: file path
         :param size: file size
         """
-        with open(path, 'a', os.SEEK_SET) as f:
+        with open(path, "a", os.SEEK_SET) as f:
             f.truncate(size)
 
     def do_open(self, f: str, mode: str) -> tuple:
@@ -63,8 +64,7 @@ class BlockSync(object):
             """읽어 들인 크기만큼 cache 제거
             """
             self.fadvise(
-                f, f.tell() - block_size,
-                block_size, os.POSIX_FADV_DONTNEED,
+                f, f.tell() - block_size, block_size, os.POSIX_FADV_DONTNEED,
             )
             yield block
 
@@ -98,9 +98,9 @@ class BlockSync(object):
 
     def recv_all(self, buffer_size=BUFFER_SIZE):
         if self.socket_ is None:
-            raise Exception('socket is none')
+            raise Exception("socket is none")
 
-        data = b''
+        data = b""
 
         while True:
             packet = self.socket_.recv(buffer_size)
@@ -110,13 +110,10 @@ class BlockSync(object):
                 return data
 
     def new_sync_channel(self, addr_family, port=None, wait_timeout=60):
-        self.socket_ = socket.socket(
-            addr_family,
-            socket.SOCK_STREAM,
-        )
+        self.socket_ = socket.socket(addr_family, socket.SOCK_STREAM,)
         self.socket_.settimeout(wait_timeout)
         self.socket_.listen(1)
-        self.socket_.bind(('0.0.0.0', port if port else 0))
+        self.socket_.bind(("0.0.0.0", port if port else 0))
         return self.socket_
 
     def start_sync_channel(self, socket_: socket = None):
@@ -130,7 +127,7 @@ class BlockSync(object):
         if create > 0:
             self.do_create(dest, create)
 
-        dest_dev, dest_size = self.do_open(dest, 'rb+')
+        dest_dev, dest_size = self.do_open(dest, "rb+")
         """수신 서버의 파일 크기 전달하여 같은 크기의 파일인지 검사
         송신 서버에서 크기가 다를 시 socket 닫음
         """
@@ -159,34 +156,34 @@ class BlockSync(object):
         on_error: 에러 발생 시 실행 시킬 callback 함수
         """
         blocks = {
-            'size_blocks': 0,
-            'same_blocks': 0,
-            'diff_blocks': 0,
-            'done_blocks': 0,
-            'delta_block': 0,
-            'last_block': 0,
-            'rate': -1,
+            "size_blocks": 0,
+            "same_blocks": 0,
+            "diff_blocks": 0,
+            "done_blocks": 0,
+            "delta_block": 0,
+            "last_block": 0,
+            "rate": -1,
         }
-        before = kwargs.get('before')
-        after = kwargs.get('after')
-        on_error = kwargs.get('on_error')
+        before = kwargs.get("before")
+        after = kwargs.get("after")
+        on_error = kwargs.get("on_error")
 
         if before:
             before()
 
         try:
-            if server == 'localhost':
+            if server == "localhost":
                 if src_dev == dest_dev:
-                    raise ValueError('Error same source and destination')
+                    raise ValueError("Error same source and destination")
 
-                src_dev, source_size = self.do_open(src_dev, 'rb+')
-                dest_dev, dest_size = self.do_open(dest_dev, 'rb+')
+                src_dev, source_size = self.do_open(src_dev, "rb+")
+                dest_dev, dest_size = self.do_open(dest_dev, "rb+")
 
                 try:
                     if source_size != dest_size:
-                        raise Exception('Error devices size not same')
+                        raise Exception("Error devices size not same")
 
-                    blocks['size_blocks'] = source_size
+                    blocks["size_blocks"] = source_size
                     return self.local_sync(src_dev, dest_dev, blocks, **kwargs)
                 finally:
                     src_dev.close()
@@ -209,9 +206,7 @@ class BlockSync(object):
                 }
                 """
                 response = requests.request(
-                    method=kwargs.get('method', 'GET'),
-                    url=server,
-                    **kwargs,
+                    method=kwargs.get("method", "GET"), url=server, **kwargs,
                 )
 
                 if response.status_code != 200:
@@ -221,8 +216,8 @@ class BlockSync(object):
                 return self.remote_sync(
                     src_dev=src_dev,
                     dest_dev=dest_dev,
-                    address=response_json.get('socket_addr'),
-                    port=response_json.get('port'),
+                    address=response_json.get("socket_addr"),
+                    port=response_json.get("port"),
                 )
         except Exception as e:
             logger.error(e, exc_info=True)
@@ -234,35 +229,38 @@ class BlockSync(object):
             if after:
                 after()
 
-    def local_sync(self, src_dev, dest_dev, blocks: dict,
-                   block_size=MiB, interval=1, **kwargs):
+    def local_sync(
+        self, src_dev, dest_dev, blocks: dict, block_size=MiB, interval=1, **kwargs
+    ):
         """
         monitoring: interval마다 실행될 callback 함수
         """
         t0 = time.time()
         t_last = 0
-        monitoring = kwargs.get('monitoring')
+        monitoring = kwargs.get("monitoring")
 
-        for idx, block in enumerate(zip(
+        for idx, block in enumerate(
+            zip(
                 self.get_blocks(src_dev, block_size),
                 self.get_blocks(dest_dev, block_size),
-        )):
+            )
+        ):
             if block[0] == block[1]:
-                blocks['same_blocks'] += 1
+                blocks["same_blocks"] += 1
             else:
                 dest_dev.seek(-block_size, os.SEEK_CUR)
                 dest_dev.write(block[0])
-                blocks['diff_blocks'] += 1
+                blocks["diff_blocks"] += 1
 
             t1 = time.time()
-            blocks['done_blocks'] = blocks['same_blocks'] + blocks['diff_blocks']
+            blocks["done_blocks"] = blocks["same_blocks"] + blocks["diff_blocks"]
 
             if t1 - t_last >= interval:
-                blocks['delta_block'] = blocks['done_blocks'] - blocks['last_block']
-                blocks['last_block'] = blocks['done_blocks']
-                blocks['rate'] = self.get_rate(
-                    size_blocks=blocks['size_blocks'],
-                    done_blocks=blocks['done_blocks'] * block_size,
+                blocks["delta_block"] = blocks["done_blocks"] - blocks["last_block"]
+                blocks["last_block"] = blocks["done_blocks"]
+                blocks["rate"] = self.get_rate(
+                    size_blocks=blocks["size_blocks"],
+                    done_blocks=blocks["done_blocks"] * block_size,
                 )
 
                 if monitoring:
@@ -270,20 +268,23 @@ class BlockSync(object):
 
                 t_last = t1
 
-            if (blocks['same_blocks'] + blocks['diff_blocks']) == blocks['size_blocks']:
+            if (blocks["same_blocks"] + blocks["diff_blocks"]) == blocks["size_blocks"]:
                 break
 
         t_last = time.time()
-        logger.debug({
-            'same': blocks['same_blocks'],
-            'diff': blocks['diff_blocks'],
-            'speed': self.get_speed(
-                t1=t0, t2=t_last,
-                block_size=blocks['done_blocks'] * block_size,
-                unit=block_size,
-            ),
-            'elapsed': t_last - t0,
-        })
+        logger.debug(
+            {
+                "same": blocks["same_blocks"],
+                "diff": blocks["diff_blocks"],
+                "speed": self.get_speed(
+                    t1=t0,
+                    t2=t_last,
+                    block_size=blocks["done_blocks"] * block_size,
+                    unit=block_size,
+                ),
+                "elapsed": t_last - t0,
+            }
+        )
         return blocks
 
     def remote_sync(self, src_dev, dest_dev, address, port, **kwargs):
