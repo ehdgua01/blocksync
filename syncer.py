@@ -1,7 +1,12 @@
 import os
 import abc
-from typing import IO, Any, Tuple
+from typing import IO, Any, Tuple, Callable, Dict
 from enum import Enum
+
+
+UNITS: Dict[str, int] = {
+    "MiB": 1024 * 1024,
+}
 
 
 class FADV(Enum):
@@ -10,8 +15,6 @@ class FADV(Enum):
 
 
 class Syncer(abc.ABC):
-    MiB = 1024 * 1024
-
     def __init__(self) -> None:
         """
         size = source file size
@@ -51,6 +54,8 @@ class Syncer(abc.ABC):
 
     def do_open(self, path_: str, mode: str) -> Tuple[IO, int]:
         """
+        open local file
+
         :param path_: file path
         :param mode: file open mode
         :return: file-object, file size
@@ -64,7 +69,6 @@ class Syncer(abc.ABC):
 
     def get_blocks(self, f: IO, block_size: int) -> Any:
         """
-
         :param f:
         :param block_size:
         :return:
@@ -82,5 +86,17 @@ class Syncer(abc.ABC):
         return (self.blocks["done"] / self.blocks["size"]) * 100
 
     @abc.abstractmethod
-    def sync(self, *args, **kwargs) -> Any:
+    def sync(
+        self,
+        src_dev: str,
+        dest_dev: str,
+        block_size: int = UNITS["MiB"],
+        interval: int = 1,
+        before: Callable = None,
+        monitor: Callable = None,
+        after: Callable = None,
+        on_error: Callable = None,
+        *args,
+        **kwargs,
+    ) -> Any:
         pass
