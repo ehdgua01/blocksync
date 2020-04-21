@@ -79,7 +79,7 @@ class Syncer(abc.ABC):
         """
         :return: current sync rate
         """
-        return (self.blocks["done_blocks"] / self.blocks["size"]) * 100
+        return (self.blocks["done"] / self.blocks["size"]) * 100
 
     @abc.abstractmethod
     def sync(self, *args, **kwargs) -> Any:
