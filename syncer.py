@@ -26,6 +26,8 @@ class Syncer(abc.ABC):
 
     def fadvise(self, fd: IO, offset: int, length: int, advice: FADV) -> None:
         """
+        POSIX fadvice
+
         POSIX_FADV_NOREUSE
         - tells the kernel that the file can be removed from cache,
           flag that gets invalidated if another process is accessing the same file
@@ -37,6 +39,8 @@ class Syncer(abc.ABC):
 
     def do_create(self, path: str, size: int) -> None:
         """
+        create file on local
+
         :param path: file path
         :param size: file size
         """
@@ -60,6 +64,8 @@ class Syncer(abc.ABC):
 
     def get_blocks(self, f: IO, block_size: int) -> Any:
         """
+        read a block sequentially from the file
+
         :param f:
         :param block_size:
         :return:
@@ -90,4 +96,5 @@ class Syncer(abc.ABC):
         *args,
         **kwargs,
     ) -> None:
+        """Synchronize destination files to source files"""
         pass
