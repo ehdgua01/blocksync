@@ -3,7 +3,8 @@ import time
 import logging
 from typing import Callable
 
-from .syncer import Syncer, UNITS
+from syncer import Syncer
+from consts import UNITS
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class LocalSyncer(Syncer):
         on_error: Callable = None,
         *args,
         **kwargs,
-    ):
+    ) -> None:
         if src_dev == dest_dev:
             raise ValueError("Error same source and destination")
 

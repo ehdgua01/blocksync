@@ -1,17 +1,8 @@
 import os
 import abc
-from typing import IO, Any, Tuple, Callable, Dict
-from enum import Enum
+from typing import IO, Any, Tuple, Callable
 
-
-UNITS: Dict[str, int] = {
-    "MiB": 1024 * 1024,
-}
-
-
-class FADV(Enum):
-    no_reuse = os.POSIX_FADV_NOREUSE
-    dont_need = os.POSIX_FADV_DONTNEED
+from consts import FADV, UNITS
 
 
 class Syncer(abc.ABC):
@@ -98,5 +89,5 @@ class Syncer(abc.ABC):
         on_error: Callable = None,
         *args,
         **kwargs,
-    ) -> Any:
+    ) -> None:
         pass
