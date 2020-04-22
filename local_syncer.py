@@ -54,11 +54,12 @@ class LocalSyncer(Syncer):
                         self.blocks["diff"] += 1
 
                     self.blocks["done"] = self.blocks["same"] + self.blocks["diff"]
-                    self.blocks["delta"] = self.blocks["done"] - self.blocks["last"]
-                    self.blocks["last"] = self.blocks["done"]
-                    t1 = time.time()
 
+                    t1 = time.time()
                     if t1 - t_last >= interval:
+                        self.blocks["delta"] = self.blocks["done"] - self.blocks["last"]
+                        self.blocks["last"] = self.blocks["done"]
+
                         if monitor:
                             monitor(*args, **kwargs)
 
@@ -68,6 +69,7 @@ class LocalSyncer(Syncer):
                         "size"
                     ]:
                         break
+
                 if after:
                     after(*args, **kwargs)
             except Exception as e:
