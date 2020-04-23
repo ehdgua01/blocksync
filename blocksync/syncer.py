@@ -2,7 +2,8 @@ import os
 import abc
 from typing import IO, Any, Tuple, Callable, List
 
-from consts import FADV, UNITS
+from blocksync.consts import FADV, UNITS
+from blocksync.exception import StopSync, ForceStopSync
 
 
 class Syncer(abc.ABC):
@@ -81,6 +82,12 @@ class Syncer(abc.ABC):
         :return: current sync rate
         """
         return (self.blocks["done"] / self.blocks["size"]) * 100
+
+    def stop(self) -> None:
+        raise StopSync()
+
+    def force_stop(self) -> None:
+        raise ForceStopSync()
 
     @abc.abstractmethod
     def sync(

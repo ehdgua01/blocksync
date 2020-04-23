@@ -1,7 +1,7 @@
 from typing import Callable, List
 
-from syncer import Syncer
-from consts import UNITS
+from blocksync.syncer import Syncer
+from blocksync.consts import UNITS
 
 
 class RemoteSyncer(Syncer):

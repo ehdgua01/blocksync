@@ -3,8 +3,9 @@ import time
 import logging
 from typing import Callable, List
 
-from syncer import Syncer
-from consts import UNITS
+from blocksync.syncer import Syncer
+from blocksync.consts import UNITS
+from blocksync.exception import StopSync, ForceStopSync
 
 logger = logging.getLogger(__name__)
 
@@ -77,10 +78,12 @@ class LocalSyncer(Syncer):
 
                     if after:
                         after(*args, **kwargs)
-                except Exception as e:
-                    logger.error(e)
-                    on_error(*args, **kwargs)
                 finally:
                     __dev.close()
+        except ForceStopSync:
+            logger.info("Force stop sync")
+        except (Exception, StopSync) as e:
+            logger.error(e)
+            on_error(*args, **kwargs)
         finally:
             src_dev.close()
