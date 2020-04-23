@@ -7,6 +7,8 @@ UNITS: Dict[str, int] = {
     "MiB": 1024 * 1024,
 }
 
+SSH_PORT = 22
+
 
 class FADV(Enum):
     no_reuse = os.POSIX_FADV_NOREUSE
