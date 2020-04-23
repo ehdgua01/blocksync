@@ -26,10 +26,10 @@ class LocalSyncer(Syncer):
         if src_dev in dest_dev:
             raise ValueError("source and destination are same")
 
+        src_dev, src_size = self.do_open(src_dev, "rb+")
+
         if before:
             before(*args, **kwargs)
-
-        src_dev, src_size = self.do_open(src_dev, "rb+")
 
         try:
             for dest in dest_dev:
