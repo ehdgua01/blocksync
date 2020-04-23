@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, List
 
 from syncer import Syncer
 from consts import UNITS
@@ -8,7 +8,7 @@ class RemoteSyncer(Syncer):
     def sync(
         self,
         src_dev: str,
-        dest_dev: str,
+        dest_dev: List[str],
         block_size: int = UNITS["MiB"],
         interval: int = 1,
         before: Callable = None,
@@ -18,4 +18,7 @@ class RemoteSyncer(Syncer):
         *args,
         **kwargs,
     ) -> None:
+        """
+        Synchronize remote destination file using local source file
+        """
         pass

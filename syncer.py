@@ -1,6 +1,6 @@
 import os
 import abc
-from typing import IO, Any, Tuple, Callable
+from typing import IO, Any, Tuple, Callable, List
 
 from consts import FADV, UNITS
 
@@ -86,7 +86,7 @@ class Syncer(abc.ABC):
     def sync(
         self,
         src_dev: str,
-        dest_dev: str,
+        dest_dev: List[str],
         block_size: int = UNITS["MiB"],
         interval: int = 1,
         before: Callable = None,

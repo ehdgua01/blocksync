@@ -1,7 +1,7 @@
 import os
 import time
 import logging
-from typing import Callable
+from typing import Callable, List
 
 from syncer import Syncer
 from consts import UNITS
@@ -13,7 +13,7 @@ class LocalSyncer(Syncer):
     def sync(
         self,
         src_dev: str,
-        dest_dev: str,
+        dest_dev: List[str],
         block_size: int = UNITS["MiB"],
         interval: int = 1,
         before: Callable = None,
@@ -30,51 +30,57 @@ class LocalSyncer(Syncer):
             before(*args, **kwargs)
 
         src_dev, src_size = self.do_open(src_dev, "rb+")
-        dest_dev, dest_size = self.do_open(dest_dev, "rb+")
 
         try:
-            if src_size != dest_size:
-                raise ValueError("Error devices size not same")
+            for dest in dest_dev:
+                logger.info(f"Start sync {dest}")
+                __dev, __size = self.do_open(dest, "rb+")
 
-            try:
-                self.blocks["size"] = src_size
-                t_last = 0
+                if src_size != __size:
+                    raise ValueError("Error devices size not same")
 
-                for idx, block in enumerate(
-                    zip(
-                        self.get_blocks(src_dev, block_size),
-                        self.get_blocks(dest_dev, block_size),
-                    )
-                ):
-                    if block[0] == block[1]:
-                        self.blocks["same"] += 1
-                    else:
-                        dest_dev.seek(-block_size, os.SEEK_CUR)
-                        dest_dev.write(block[0])
-                        self.blocks["diff"] += 1
+                try:
+                    self.blocks["size"] = src_size
+                    t_last = 0
 
-                    self.blocks["done"] = self.blocks["same"] + self.blocks["diff"]
+                    for idx, block in enumerate(
+                        zip(
+                            self.get_blocks(src_dev, block_size),
+                            self.get_blocks(__dev, block_size),
+                        )
+                    ):
+                        if block[0] == block[1]:
+                            self.blocks["same"] += 1
+                        else:
+                            __dev.seek(-block_size, os.SEEK_CUR)
+                            __dev.write(block[0])
+                            self.blocks["diff"] += 1
 
-                    t1 = time.time()
-                    if t1 - t_last >= interval:
-                        self.blocks["delta"] = self.blocks["done"] - self.blocks["last"]
-                        self.blocks["last"] = self.blocks["done"]
+                        self.blocks["done"] = self.blocks["same"] + self.blocks["diff"]
 
-                        if monitor:
-                            monitor(*args, **kwargs)
+                        t1 = time.time()
+                        if t1 - t_last >= interval:
+                            self.blocks["delta"] = (
+                                self.blocks["done"] - self.blocks["last"]
+                            )
+                            self.blocks["last"] = self.blocks["done"]
 
-                        t_last = t1
+                            if monitor:
+                                monitor(*args, **kwargs)
 
-                    if (self.blocks["same"] + self.blocks["diff"]) == self.blocks[
-                        "size"
-                    ]:
-                        break
+                            t_last = t1
 
-                if after:
-                    after(*args, **kwargs)
-            except Exception as e:
-                logger.error(e)
-                on_error(*args, **kwargs)
+                        if (self.blocks["same"] + self.blocks["diff"]) == self.blocks[
+                            "size"
+                        ]:
+                            break
+
+                    if after:
+                        after(*args, **kwargs)
+                except Exception as e:
+                    logger.error(e)
+                    on_error(*args, **kwargs)
+                finally:
+                    __dev.close()
         finally:
             src_dev.close()
-            dest_dev.close()
