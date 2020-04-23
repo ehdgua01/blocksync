@@ -23,8 +23,8 @@ class LocalSyncer(Syncer):
         *args,
         **kwargs,
     ) -> None:
-        if src_dev == dest_dev:
-            raise ValueError("Error same source and destination")
+        if src_dev in dest_dev:
+            raise ValueError("source and destination are same")
 
         if before:
             before(*args, **kwargs)
@@ -37,7 +37,7 @@ class LocalSyncer(Syncer):
                 __dev, __size = self.do_open(dest, "rb+")
 
                 if src_size != __size:
-                    raise ValueError("Error devices size not same")
+                    raise ValueError("size not same")
 
                 try:
                     self.blocks["size"] = src_size
