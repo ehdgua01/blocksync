@@ -1,13 +1,10 @@
 import os
 import time
-import logging
 from typing import Callable, List
 
 from blocksync.syncer import Syncer
 from blocksync.consts import UNITS
 from blocksync.exception import StopSync, ForceStopSync
-
-logger = logging.getLogger(__name__)
 
 
 class LocalSyncer(Syncer):
@@ -34,7 +31,7 @@ class LocalSyncer(Syncer):
 
         try:
             for dest in dest_dev:
-                logger.info(f"Start sync {dest}")
+                self.logger.info(f"Start sync {dest}")
                 __dev, __size = self.do_open(dest, "rb+")
 
                 if src_size != __size:
@@ -81,9 +78,9 @@ class LocalSyncer(Syncer):
                 finally:
                     __dev.close()
         except ForceStopSync:
-            logger.info("Force stop sync")
+            self.logger.info("Force stop sync")
         except (Exception, StopSync) as e:
-            logger.error(e)
+            self.logger.error(e)
             on_error(*args, **kwargs)
         finally:
             src_dev.close()

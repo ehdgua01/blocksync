@@ -1,9 +1,12 @@
 import os
 import abc
+import logging
 from typing import IO, Any, Tuple, Callable, List
 
 from blocksync.consts import FADV, UNITS
 from blocksync.exception import StopSync, ForceStopSync
+
+logger = logging.getLogger(__name__)
 
 
 class Syncer(abc.ABC):
@@ -24,6 +27,7 @@ class Syncer(abc.ABC):
             "delta": 0,
             "last": 0,
         }
+        self.logger = logger
 
     def fadvise(self, fd: IO, offset: int, length: int, advice: FADV) -> None:
         """
