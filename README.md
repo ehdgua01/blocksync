@@ -2,13 +2,13 @@
 
 This repo is inspired by https://github.com/theraser/blocksync
 
-# Todos
+# Roadmap
 
 ## Local
 
 - [x] LocalSyncer 구현
 - [x] Event handler 추가
-- [ ] Multiprocessing 지원
+- [ ] Multiprocessing or Concurrency(async, threading) 지원
   - Worker(Process)별로 작업량과 범위 할당
 
 ## Remote
@@ -22,5 +22,5 @@ This repo is inspired by https://github.com/theraser/blocksync
   - 직렬 동기화(Sequence)
   - 병렬 동기화(Concurrency)
 - [ ] Compression 지원
-- [ ] hashing 지원
-- [ ] double hashing 지원
+- [ ] SSH cipher 지원
+- [ ] hashing, double hashing 지원
