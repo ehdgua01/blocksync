@@ -62,12 +62,10 @@ class Syncer(abc.ABC):
         :return: file-object, file size
         """
         if remote:
-            __sftp_client = getattr(self, "_sftp_client", False)
-
-            if not __sftp_client:
+            if __sftp_client := getattr(self, "_sftp_client", False):
+                f = __sftp_client.file(filename=path_, mode=mode)
+            else:
                 raise Exception("can't get sftp client")
-
-            f = __sftp_client.file(filename=path_, mode=mode)
         else:
             f = open(path_, mode)
         f.seek(os.SEEK_SET, os.SEEK_END)
