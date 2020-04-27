@@ -48,16 +48,24 @@ class Syncer(abc.ABC):
         with open(path, "a", os.SEEK_SET) as f:
             f.truncate(size)
 
-    def do_open(self, path_: str, mode: str) -> Tuple[IO, int]:
+    def do_open(self, path_: str, mode: str, remote=False) -> Tuple[IO, int]:
         """
         open local file
 
         :param path_: file path
         :param mode: file open mode
+        :param remote: flag of remote file open
         :return: file-object, file size
         """
-        f = open(path_, mode)
-        self.fadvise(f, 0, 0, FADV.no_reuse)
+        if remote:
+            __sftp_client = getattr(self, "_sftp_client", False)
+
+            if not __sftp_client:
+                raise Exception("can't get sftp client")
+
+            f = __sftp_client.file(filename=path_, mode=mode)
+        else:
+            f = open(path_, mode)
         f.seek(os.SEEK_SET, os.SEEK_END)
         size = f.tell()
         f.seek(os.SEEK_SET)
@@ -72,9 +80,6 @@ class Syncer(abc.ABC):
         :return:
         """
         while block := f.read(block_size):
-            self.fadvise(
-                f, f.tell() - block_size, block_size, FADV.dont_need,
-            )
             yield block
 
     def get_rate(self) -> float:
