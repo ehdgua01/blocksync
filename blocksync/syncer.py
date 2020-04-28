@@ -1,7 +1,7 @@
 import os
 import time
 import logging
-from typing import IO, Any, Tuple, Callable, List, Union, DefaultDict, Dict
+from typing import IO, Any, Tuple, Callable, Union, DefaultDict, Dict
 from collections import defaultdict
 
 import paramiko
@@ -52,18 +52,22 @@ class Syncer:
         with open(path, "a", os.SEEK_SET) as f:
             f.truncate(size)
 
-    def do_open(self, path_: str, mode: str) -> Tuple[IO, int]:
+    def do_open(self, path_: str, mode: str, remote=False) -> Tuple[IO, int]:
         """
         open local file
 
         :param path_: file path
         :param mode: file open mode
+        :param remote
         :return: file-object, file size
         """
-        if __sftp_client := getattr(self, "_sftp_client", False):
-            f = __sftp_client.file(filename=path_, mode=mode)
-        else:
+        if remote and self._sftp:
+            f = self._sftp.file(filename=path_, mode=mode)
+        elif not remote:
             f = open(path_, mode)
+        else:
+            raise Exception("SFTPClient not opened")
+
         f.seek(os.SEEK_SET, os.SEEK_END)
         size = f.tell()
         f.seek(os.SEEK_SET)
@@ -89,9 +93,9 @@ class Syncer:
 
     def stop(self) -> None:
         """
-        stop sync
         :return:
         """
+        self.logger.info("Stop sync")
         raise StopSync()
 
     def open_sftp(
@@ -100,23 +104,27 @@ class Syncer:
         username: str = None,
         password: str = None,
         compress: bool = True,
-        cipher: Tuple[str] = ("blowfish",),
+        cipher: str = "aes128-ctr",
         port: int = SSH_PORT,
         key_filename: str = None,
     ):
+        if cipher not in paramiko.Transport._preferred_ciphers:
+            raise ValueError("Invalid cipher type")
+
+        disabled_ciphers = (
+            c for c in paramiko.Transport._preferred_ciphers if c != cipher
+        )
+
         with paramiko.SSHClient() as ssh:
             ssh.load_system_host_keys(key_filename)
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            cipher = (
-                c for c in paramiko.Transport._preferred_ciphers if c not in cipher
-            )
             ssh.connect(
                 hostname=hostname,
                 port=port,
                 username=username,
                 password=password,
                 compress=compress,
-                disabled_algorithms={"cipher": cipher},
+                disabled_algorithms={"cipher": disabled_ciphers},
             )
             self._sftp = ssh.open_sftp()
 
@@ -132,8 +140,9 @@ class Syncer:
 
     def serial_sync(
         self,
+        server: str,
         src_dev: str,
-        destinations: List[str],
+        destinations: Tuple[str],
         block_size: int = UNITS["MiB"],
         interval: int = 1,
         before: Callable = None,
@@ -154,6 +163,7 @@ class Syncer:
                     before(*args, **kwargs)
 
                 self._sync(
+                    server,
                     src_dev,
                     src_size,
                     dest,
@@ -170,7 +180,7 @@ class Syncer:
                 if callable(after):
                     after(*args, **kwargs)
         except StopSync:
-            self.logger.info("Force stop sync")
+            pass
         except Exception as e:
             self.logger.error(e)
 
@@ -181,6 +191,7 @@ class Syncer:
 
     def _sync(
         self,
+        server: str,
         src_dev: IO,
         src_size: int,
         dest: str,
@@ -190,13 +201,15 @@ class Syncer:
         *args,
         **kwargs,
     ):
-        dest_dev, dest_size = self.do_open(dest, "rb+")
+        dest_dev, dest_size = self.do_open(
+            dest, "rb+", True if server == "remote" else False
+        )
 
         try:
             if src_size != dest_size:
                 raise ValueError("size not same")
 
-            self.logger.info(f"Start sync {dest_dev}")
+            self.logger.info(f"Start sync {dest}")
             self.blocks[dest]["size"] = src_size
             t_last = 0
 
