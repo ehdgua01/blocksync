@@ -106,6 +106,7 @@ class Syncer:
     ):
         with paramiko.SSHClient() as ssh:
             ssh.load_system_host_keys(key_filename)
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             cipher = (
                 c for c in paramiko.Transport._preferred_ciphers if c not in cipher
             )
@@ -119,8 +120,15 @@ class Syncer:
             )
             self._sftp = ssh.open_sftp()
 
-    def get_sftp_client(self) -> Union[None, paramiko.SFTPClient]:
+    def set_sftp(self, sftp: paramiko.SFTPClient):
+        self._sftp = sftp
+
+    def get_sftp(self) -> Union[None, paramiko.SFTPClient]:
         return self._sftp
+
+    def close_sftp(self) -> None:
+        if self._sftp:
+            self._sftp.close()
 
     def serial_sync(
         self,
