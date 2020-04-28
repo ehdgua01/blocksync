@@ -138,13 +138,14 @@ class Syncer:
         if self._sftp:
             self._sftp.close()
 
-    def serial_sync(
+    def serial(
         self,
         server: str,
         src_dev: str,
         destinations: Tuple[str],
         block_size: int = UNITS["MiB"],
         interval: int = 1,
+        pause: float = 0.1,
         before: Callable = None,
         monitor: Callable = None,
         after: Callable = None,
@@ -163,16 +164,14 @@ class Syncer:
                     before(*args, **kwargs)
 
                 self._sync(
-                    server,
-                    src_dev,
-                    src_size,
-                    dest,
-                    block_size,
-                    interval,
-                    before,
-                    monitor,
-                    after,
-                    on_error,
+                    server=server,
+                    src_dev=src_dev,
+                    src_size=src_size,
+                    dest=dest,
+                    block_size=block_size,
+                    interval=interval,
+                    monitor=monitor,
+                    pause=pause,
                     *args,
                     **kwargs,
                 )
@@ -189,6 +188,22 @@ class Syncer:
         finally:
             src_dev.close()
 
+    def concurrency(
+        self,
+        server: str,
+        src_dev: str,
+        destinations: Tuple[str],
+        block_size: int = UNITS["MiB"],
+        interval: int = 1,
+        before: Callable = None,
+        monitor: Callable = None,
+        after: Callable = None,
+        on_error: Callable = None,
+        *args,
+        **kwargs,
+    ) -> None:
+        pass
+
     def _sync(
         self,
         server: str,
@@ -198,6 +213,7 @@ class Syncer:
         block_size: int,
         interval: int = 1,
         monitor: Callable = None,
+        pause: float = 0.1,
         *args,
         **kwargs,
     ):
@@ -246,5 +262,8 @@ class Syncer:
                     self.blocks[dest]["same"] + self.blocks[dest]["diff"]
                 ) == self.blocks[dest]["size"]:
                     break
+
+                if 0 < pause:
+                    time.sleep(pause)
         finally:
             dest_dev.close()
