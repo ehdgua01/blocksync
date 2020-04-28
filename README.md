@@ -8,6 +8,7 @@ This repo is inspired by https://github.com/theraser/blocksync
 
 - [x] LocalSyncer 구현
 - [x] Event handler 추가
+- [ ] dryrun 기능 추가
 - [ ] Multiprocessing or Concurrency(async, threading) 지원
   - Worker(Process)별로 작업량과 범위 할당
 
@@ -24,3 +25,4 @@ This repo is inspired by https://github.com/theraser/blocksync
 - [ ] Compression 지원
 - [ ] SSH cipher 지원
 - [ ] hashing, double hashing 지원
+- [ ] dryrun 기능 추가
