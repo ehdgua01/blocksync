@@ -1,16 +1,16 @@
 import os
 import time
 import logging
-from typing import IO, Any, Tuple, Callable, Union, DefaultDict, Dict
+from typing import IO, Any, Tuple, Callable, Union
 from collections import defaultdict
 
 import paramiko
 
 from blocksync.consts import FADV, UNITS, SSH_PORT
 from blocksync.exception import StopSync
+from blocksync.types import BlocksType
 
 logger = logging.getLogger(__name__)
-BlocksType = DefaultDict[str, Dict[str, int]]
 
 
 class Syncer:
@@ -187,22 +187,6 @@ class Syncer:
                 on_error(*args, **kwargs)
         finally:
             src_dev.close()
-
-    def concurrency(
-        self,
-        server: str,
-        src_dev: str,
-        destinations: Tuple[str],
-        block_size: int = UNITS["MiB"],
-        interval: int = 1,
-        before: Callable = None,
-        monitor: Callable = None,
-        after: Callable = None,
-        on_error: Callable = None,
-        *args,
-        **kwargs,
-    ) -> None:
-        pass
 
     def _sync(
         self,
