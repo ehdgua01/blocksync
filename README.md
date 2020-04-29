@@ -16,3 +16,4 @@ This repo is inspired by https://github.com/theraser/blocksync
 - [x] Compression 지원
 - [x] SSH cipher 지원
 - [ ] hashing, double hashing 지원
+- [ ] Cache pressure 지원
