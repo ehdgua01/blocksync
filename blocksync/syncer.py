@@ -7,7 +7,7 @@ from collections import defaultdict
 import paramiko
 
 from blocksync.consts import FADV, UNITS, SSH_PORT
-from blocksync.exception import StopSync
+from blocksync.interrupt import StopSync
 from blocksync.types import BlocksType
 
 logger = logging.getLogger(__name__)
@@ -90,13 +90,6 @@ class Syncer:
         """
         if dest in self.blocks:
             return (self.blocks[dest]["done"] / self.blocks[dest]["size"]) * 100
-
-    def stop(self) -> None:
-        """
-        :return:
-        """
-        self.logger.info("Stop sync")
-        raise StopSync()
 
     def open_sftp(
         self,
