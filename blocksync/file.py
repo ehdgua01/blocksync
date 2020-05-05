@@ -52,7 +52,7 @@ class File(object):
         if self.connected:
             return self
 
-        if not session:
+        if session is None:
             self._ssh = paramiko.SSHClient()
             self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy)
             self._ssh.load_system_host_keys()
