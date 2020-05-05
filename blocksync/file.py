@@ -12,6 +12,7 @@ class File(object):
         self,
         path: Union[PurePath, str],
         block_size: int = UNITS["MiB"],
+        start_pos: int = os.SEEK_SET,
         create: bool = False,
         remote: bool = False,
         hostname: str = None,
@@ -31,6 +32,7 @@ class File(object):
         self._block_size = block_size
         self._io = None
         self._size = 0
+        self._start_pos = start_pos
 
         self._create = create
         self._remote = remote
@@ -77,7 +79,7 @@ class File(object):
         self._io = self._open(self._path, mode="rb+")
         self._io.seek(os.SEEK_SET, os.SEEK_END)
         self._size = self._io.tell()
-        self._io.seek(os.SEEK_SET)
+        self._io.seek(self._start_pos)
         return self
 
     def do_close(self) -> "File":
