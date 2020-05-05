@@ -80,6 +80,14 @@ class File(object):
         self._io.seek(os.SEEK_SET)
         return self
 
+    def do_close(self) -> "File":
+        if self.opened:
+            self._io.close()
+
+        if self._remote and self.connected:
+            self.close_sftp()
+        return self
+
     def get_blocks(self) -> Any:
         while self.opened:
             if block := self._io.read(self._block_size):
