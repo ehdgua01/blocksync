@@ -27,16 +27,12 @@ class File(object):
         if remote and (cipher not in __paramiko_ciphers):
             raise ValueError("Invalid ssh encryption algorithm")
 
-        self._path = path
-        self._block_size = block_size
-        self._start_pos = start_pos
-
-        self._io: Union[IO, None] = None
-        self._size: int = 0
-
-        self._remote = remote
-        self._ssh = Union[paramiko.SSHClient, None] = None
-        self._ssh_options: Dict[str, Any] = {
+        self.path = path
+        self.block_size = block_size
+        self.start_pos = start_pos
+        self.size: int = 0
+        self.remote = remote
+        self.ssh_options: Dict[str, Any] = {
             "hostname": hostname,
             "port": port,
             "username": username,
@@ -47,6 +43,9 @@ class File(object):
                 "cipher": [c for c in __paramiko_ciphers if cipher != c]
             },
         }
+
+        self._io: Union[IO, None] = None
+        self._ssh = Union[paramiko.SSHClient, None] = None
         self._sftp: Union[paramiko.SFTPClient, None] = None
 
     def open_sftp(self, session: paramiko.SSHClient = None) -> "File":
@@ -57,7 +56,7 @@ class File(object):
             self._ssh = paramiko.SSHClient()
             self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy)
             self._ssh.load_system_host_keys()
-            self._ssh.connect(**self._ssh_options)
+            self._ssh.connect(**self.ssh_options)
         elif isinstance(session, paramiko.SSHClient):
             self._ssh = session
         else:
@@ -72,15 +71,15 @@ class File(object):
         return self
 
     def do_create(self, size: int = 0) -> "File":
-        with self._open(self._path, mode="w") as f:
-            f.truncate(size or self._size or 0)
+        with self._open(self.path, mode="w") as f:
+            f.truncate(size or self.size)
         return self
 
     def do_open(self) -> "File":
-        self._io = self._open(self._path, mode="rb+")
+        self._io = self._open(self.path, mode="rb+")
         self._io.seek(os.SEEK_SET, os.SEEK_END)
-        self._size = self._io.tell()
-        self._io.seek(self._start_pos)
+        self.size = self._io.tell()
+        self._io.seek(self.start_pos)
         return self
 
     def do_close(self, flush=False) -> "File":
@@ -89,20 +88,20 @@ class File(object):
                 self._io.flush()
             self._io.close()
 
-        if self._remote and self.connected:
+        if self.remote and self.connected:
             self.close_sftp()
         return self
 
     def get_blocks(self) -> Any:
         while self.opened:
-            if block := self._io.read(self._block_size):
+            if block := self._io.read(self.block_size):
                 yield block
             else:
                 break
 
     @property
     def _open(self) -> Callable:
-        if self._remote:
+        if self.remote:
             if not self.connected:
                 self.open_sftp()
             return self._sftp.open
