@@ -71,7 +71,7 @@ class File(object):
         return self
 
     def do_create(self, size: int = 0) -> "File":
-        with self._open(self.path, mode="w") as f:
+        with self._open(mode="w") as f:
             f.truncate(size or self.size)
         return self
 
@@ -79,7 +79,7 @@ class File(object):
         if self.opened:
             self.do_close()
 
-        self._io = self._open(self.path, mode="rb+")
+        self._io = self._open(mode="rb+")
         self._io.seek(os.SEEK_SET, os.SEEK_END)
         self.size = self._io.tell()
         self._io.seek(self.start_pos)
@@ -102,14 +102,13 @@ class File(object):
             else:
                 break
 
-    @property
-    def _open(self) -> Callable:
+    def _open(self, mode: str) -> IO:
         if self.remote:
             if not self.connected:
                 self.open_sftp()
-            return self._sftp.open
+            return self._sftp.open(self.path, mode=mode)
         else:
-            return open
+            return open(self.path, mode=mode)
 
     @property
     def connected(self) -> bool:
