@@ -61,7 +61,7 @@ class File(object):
         elif isinstance(session, paramiko.SSHClient):
             self._ssh = session
         else:
-            raise ValueError("Session is not instance of paramiko's SSHClient")
+            raise ValueError("Session isn't instance of paramiko.SSHClient")
 
         self._sftp = self._ssh.open_sftp()
         return self
