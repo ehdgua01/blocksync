@@ -1,6 +1,6 @@
 import os
 from pathlib import PurePath
-from typing import Any, Union, Dict, Callable
+from typing import Any, Union, Dict, Callable, IO
 
 import paramiko
 
@@ -13,7 +13,6 @@ class File(object):
         path: Union[PurePath, str],
         block_size: int = UNITS["MiB"],
         start_pos: int = os.SEEK_SET,
-        create: bool = False,
         remote: bool = False,
         hostname: str = None,
         port: int = SSH_PORT,
@@ -30,11 +29,11 @@ class File(object):
 
         self._path = path
         self._block_size = block_size
-        self._io = None
-        self._size = 0
         self._start_pos = start_pos
 
-        self._create = create
+        self._io: Union[IO, None] = None
+        self._size: int = 0
+
         self._remote = remote
         self._ssh = Union[paramiko.SSHClient, None] = None
         self._ssh_options: Dict[str, Any] = {
@@ -82,8 +81,10 @@ class File(object):
         self._io.seek(self._start_pos)
         return self
 
-    def do_close(self) -> "File":
+    def do_close(self, flush=False) -> "File":
         if self.opened:
+            if flush:
+                self._io.flush()
             self._io.close()
 
         if self._remote and self.connected:
