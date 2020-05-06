@@ -76,6 +76,9 @@ class File(object):
         return self
 
     def do_open(self) -> "File":
+        if self.opened:
+            self.do_close()
+
         self._io = self._open(self.path, mode="rb+")
         self._io.seek(os.SEEK_SET, os.SEEK_END)
         self.size = self._io.tell()
