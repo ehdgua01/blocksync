@@ -58,8 +58,10 @@ class File(object):
             self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy)
             self._ssh.load_system_host_keys()
             self._ssh.connect(**self._ssh_options)
-        else:
+        elif isinstance(session, paramiko.SSHClient):
             self._ssh = session
+        else:
+            raise ValueError("Session is not instance of paramiko's SSHClient")
 
         self._sftp = self._ssh.open_sftp()
         return self
