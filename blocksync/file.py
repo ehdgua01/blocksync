@@ -1,6 +1,6 @@
 import os
 from pathlib import PurePath
-from typing import Any, Union, Dict, Callable, IO
+from typing import Any, Union, Dict, IO
 
 import paramiko
 
