@@ -48,6 +48,22 @@ class File(object):
         self._ssh = Union[paramiko.SSHClient, None] = None
         self._sftp: Union[paramiko.SFTPClient, None] = None
 
+    def __str__(self):
+        return "<blocksync.File path={} block_size={} start_pos={} state={}>".format(
+            self.path,
+            self.block_size,
+            self.start_pos,
+            "opened" if self.opened else "closed",
+        )
+
+    def __repr__(self):
+        return "<blocksync.File path={} block_size={} start_pos={} state={}>".format(
+            self.path,
+            self.block_size,
+            self.start_pos,
+            "opened" if self.opened else "closed",
+        )
+
     def open_sftp(self, session: paramiko.SSHClient = None) -> "File":
         if self.connected:
             return self
@@ -85,14 +101,17 @@ class File(object):
         self._io.seek(self.start_pos)
         return self
 
-    def do_close(self, flush=False) -> "File":
-        if self.opened:
-            if flush:
-                self._io.flush()
-            self._io.close()
+    def do_close(self, flush=True) -> "File":
+        try:
+            if self.opened:
+                if flush:
+                    self._io.flush()
+                self._io.close()
 
-        if self.remote and self.connected:
-            self.close_sftp()
+            if self.remote and self.connected:
+                self.close_sftp()
+        except:
+            pass
         return self
 
     def get_blocks(self) -> Any:
@@ -101,6 +120,15 @@ class File(object):
                 yield block
             else:
                 break
+
+    def write(self, data: Any) -> "File":
+        self._io.write(data)
+        self._io.flush()
+        return self
+
+    def seek(self, offset: int, whence: int = 0) -> "File":
+        self._io.seek(offset, whence)
+        return self
 
     def _open(self, mode: str) -> IO:
         if self.remote:
