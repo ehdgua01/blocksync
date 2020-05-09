@@ -59,16 +59,28 @@ class Syncer(object):
         self._suspend = False
         self._logger = blocksync_logger
 
+    def __str__(self):
+        return "<blocksync.Syncer source={} destination={}>".format(
+            self.source, self.destination
+        )
+
+    def __repr__(self):
+        return "<blocksync.Syncer source={} destination={}>".format(
+            self.source, self.destination
+        )
+
     def set_logger(self, logger: logging.Logger) -> "Syncer":
         self._logger = logger
         return self
 
     def suspend(self) -> "Syncer":
         self._suspend = True
+        self._logger.info("Suspending...")
         return self
 
     def resume(self) -> "Syncer":
         self._suspend = False
+        self._logger.info("Resuming...")
         return self
 
     def _sync(self) -> None:
@@ -87,13 +99,20 @@ class Syncer(object):
                 self.before(self.blocks)
 
             t_last = timer()
+
             for block in zip(self.source.get_blocks(), self.destination.get_blocks()):
+                while self._suspend:
+                    time.sleep(3)
+                    self._logger.info("Suspending...")
+
                 if block[0] == block[1]:
                     self.blocks["same"] += 1
                 else:
                     self.blocks["diff"] += 1
                     if not self.dryrun:
-                        self.destination.seek(-__block_size, os.SEEK_CUR).write(block[0])
+                        self.destination.seek(-__block_size, os.SEEK_CUR).write(
+                            block[0]
+                        )
 
                 self.blocks["done"] = self.blocks["same"] + self.blocks["diff"]
 
