@@ -6,6 +6,9 @@ from timeit import default_timer as timer
 from typing import Set, Dict, Callable
 
 from blocksync.file import File
+from blocksync.utils import validate_callback
+
+__all__ = ["Syncer"]
 
 blocksync_logger = logging.getLogger(__name__)
 
@@ -49,10 +52,10 @@ class Syncer(object):
             "delta": 0,
             "last": 0,
         }
-        self.before = before
-        self.after = after
-        self.monitor = monitor
-        self.on_error = on_error
+        self.before = validate_callback(before, 1)
+        self.after = validate_callback(after, 1)
+        self.monitor = validate_callback(monitor, 1)
+        self.on_error = validate_callback(on_error, 2)
         self.interval = interval
         self.pause = pause
 
@@ -130,6 +133,12 @@ class Syncer(object):
 
                 if 0 < self.pause:
                     time.sleep(self.pause)
+
+            if self.after:
+                self.after(self.blocks)
+        except Exception as e:
+            if self.on_error:
+                self.on_error(e, self.blocks)
         finally:
             self.source.do_close()
             self.destination.do_close()

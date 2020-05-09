@@ -6,6 +6,8 @@ import paramiko
 
 from blocksync.consts import SSH_PORT, UNITS
 
+__all__ = ["File"]
+
 
 class File(object):
     def __init__(
