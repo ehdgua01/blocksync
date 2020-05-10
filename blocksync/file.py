@@ -48,9 +48,6 @@ class File(object):
         }
 
         self._local = threading.local()
-        self._local.io = None
-        self._local.ssh = None
-        self._local.sftp = None
 
     def __str__(self):
         return "<blocksync.File path={} block_size={} state={}>".format(
@@ -94,8 +91,9 @@ class File(object):
             return self
 
         self._local.io = self._open(mode="rb+")
-        self.execute("seek", os.SEEK_SET, os.SEEK_END)
-        self.size = self._local.io.tell()
+        self.size = self.execute("seek", os.SEEK_SET, os.SEEK_END).execute_with_result(
+            "tell"
+        )
         self.execute("seek", os.SEEK_SET)
         return self
 
@@ -121,14 +119,14 @@ class File(object):
 
     def execute(self, operation, *args, **kwargs) -> "File":
         if not self.opened:
-            raise Exception("File is not opened")
+            raise AttributeError("File is not opened")
 
         getattr(self._local.io, operation)(*args, **kwargs)
         return self
 
     def execute_with_result(self, operation, *args, **kwargs) -> Any:
         if not self.opened:
-            raise Exception("File is not opened")
+            raise AttributeError("File is not opened")
 
         return getattr(self._local.io, operation)(*args, **kwargs)
 
@@ -142,7 +140,11 @@ class File(object):
 
     @property
     def connected(self) -> bool:
-        if isinstance(self._local.ssh, paramiko.SSHClient) and self._local.ssh.get_transport():
+        if (
+            getattr(self._local, "ssh", False)
+            and isinstance(self._local.ssh, paramiko.SSHClient)
+            and self._local.ssh.get_transport()
+        ):
             return self._local.ssh.get_transport().is_active()
         return False
 
