@@ -1,5 +1,5 @@
-__all__ = ["StopSync"]
+__all__ = ["CancelSync"]
 
 
-class StopSync(Exception):
+class CancelSync(Exception):
     pass
