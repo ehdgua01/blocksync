@@ -95,7 +95,7 @@ class File(object):
 
     def do_open(self) -> "File":
         if self.opened:
-            self.do_close()
+            return self
 
         self._io = self._open(mode="rb+")
         self._io.seek(os.SEEK_SET, os.SEEK_END)
