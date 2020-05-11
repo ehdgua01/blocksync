@@ -53,6 +53,7 @@ class Syncer(object):
         self.interval = interval
         self.pause = pause
 
+        self._lock = threading.Lock()
         self._blocks: Dict[str, int] = {
             "size": 0,
             "same": 0,
@@ -108,6 +109,12 @@ class Syncer(object):
                     worker.join()
         return self
 
+    def _add_block(self, block: str) -> None:
+        with self._lock:
+            if block in self._blocks:
+                self._blocks[block] += 1
+                self._blocks["done"] = self._blocks["same"] + self._blocks["diff"]
+
     def _sync(self, worker_id: int) -> None:
         try:
             try:
@@ -150,16 +157,14 @@ class Syncer(object):
                     raise CancelSync()
 
                 if block[0] == block[1]:
-                    self._blocks["same"] += 1
+                    self._add_block("same")
                 else:
-                    self._blocks["diff"] += 1
+                    self._add_block("diff")
 
                     if not self.dryrun:
                         self.destination.execute(
                             "seek", -self.source.block_size, os.SEEK_CUR
                         ).execute("write", block[0]).execute("flush")
-
-                self._blocks["done"] = self._blocks["same"] + self._blocks["diff"]
 
                 if self.interval <= t_last - timer():
                     if self.monitor:
