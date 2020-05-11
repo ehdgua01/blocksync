@@ -4,7 +4,7 @@ import hashlib
 import time
 import threading
 from timeit import default_timer as timer
-from typing import List, Dict, Callable
+from typing import List, Dict, Callable, Any
 
 from blocksync.file import File
 from blocksync.utils import validate_callback
@@ -45,7 +45,9 @@ class Syncer(object):
         self.workers = workers
         self.dryrun = dryrun
         self.create = create
-        self.hash_algorithms = [getattr(hashlib, algo) for algo in hash_algorithms]
+        self.hash_algorithms: List[Callable] = [
+            getattr(hashlib, algo) for algo in hash_algorithms
+        ]
         self.before = validate_callback(before, 1) if before else None
         self.after = validate_callback(after, 1) if after else None
         self.monitor = validate_callback(monitor, 1) if monitor else None
@@ -115,6 +117,12 @@ class Syncer(object):
                 self._blocks[block] += 1
                 self._blocks["done"] = self._blocks["same"] + self._blocks["diff"]
 
+    def _hashing(self, data: Any) -> Any:
+        if 0 < len(self.hash_algorithms):
+            for hash_ in self.hash_algorithms:
+                data = hash_(data)
+        return data
+
     def _sync(self, worker_id: int) -> None:
         try:
             try:
@@ -166,7 +174,7 @@ class Syncer(object):
                     if not self.dryrun:
                         self.destination.execute(
                             "seek", -self.source.block_size, os.SEEK_CUR
-                        ).execute("write", block[0]).execute("flush")
+                        ).execute("write", self._hashing(block[0])).execute("flush")
 
                 if self.interval <= t_last - timer():
                     if self.monitor:
