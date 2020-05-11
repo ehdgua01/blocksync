@@ -55,7 +55,7 @@ class Syncer(object):
 
         self._lock = threading.Lock()
         self._blocks: Dict[str, int] = {
-            "size": 0,
+            "size": -1,
             "same": 0,
             "diff": 0,
             "done": 0,
@@ -126,6 +126,8 @@ class Syncer(object):
 
             if self.source.size != self.destination.size:
                 raise ValueError("size not same")
+            elif self._blocks["size"] == -1:
+                self._blocks["size"] = self.source.size
 
             chunk_size = self.source.size // self.workers
             end_pos = chunk_size * worker_id
@@ -195,3 +197,7 @@ class Syncer(object):
         finally:
             self.source.do_close()
             self.destination.do_close()
+
+    @property
+    def rate(self) -> float:
+        return (self._blocks["done"] / self._blocks["size"]) * 100
