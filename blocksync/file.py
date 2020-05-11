@@ -118,13 +118,13 @@ class File(object):
                 break
 
     def execute(self, operation, *args, **kwargs) -> "File":
-        if not self.opened:
-            raise AttributeError("File is not opened")
-
-        getattr(self._local.io, operation)(*args, **kwargs)
+        self._execute(operation, *args, **kwargs)
         return self
 
     def execute_with_result(self, operation, *args, **kwargs) -> Any:
+        return self._execute(operation, *args, **kwargs)
+
+    def _execute(self, operation, *args, **kwargs) -> Any:
         if not self.opened:
             raise AttributeError("File is not opened")
 
