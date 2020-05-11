@@ -35,7 +35,7 @@ Examples
 --------
 Please refer to `examples`_ at the beginning.
 
-.. _examples: https://github.com/ehdgua01/blocksync/examples
+.. _examples: https://github.com/ehdgua01/blocksync/tree/master/examples
 
 License
 -------
