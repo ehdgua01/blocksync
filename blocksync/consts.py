@@ -1,6 +1,4 @@
-import os
 from typing import Dict
-from enum import Enum
 
 __all__ = ["UNITS", "SSH_PORT"]
 
@@ -14,8 +12,3 @@ UNITS: Dict[str, int] = {
     "GiB": 1 << 30,
 }
 SSH_PORT = 22
-
-
-class FADV(Enum):
-    no_reuse = os.POSIX_FADV_NOREUSE
-    dont_need = os.POSIX_FADV_DONTNEED
