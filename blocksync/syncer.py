@@ -2,8 +2,9 @@ import os
 import logging
 import hashlib
 import time
+import threading
 from timeit import default_timer as timer
-from typing import Set, Dict, Callable
+from typing import List, Dict, Callable
 
 from blocksync.file import File
 from blocksync.utils import validate_callback
@@ -22,7 +23,7 @@ class Syncer(object):
         workers: int = 1,
         dryrun: bool = False,
         create: bool = False,
-        hash_algorithms: Set[str] = None,
+        hash_algorithms: List[str] = None,
         before: Callable = None,
         after: Callable = None,
         monitor: Callable = None,
@@ -35,8 +36,8 @@ class Syncer(object):
                 "Source or(or both) Destination isn't instance of blocksync.File"
             )
 
-        if hash_algorithms and isinstance(hash_algorithms, set):
-            if hash_algorithms.difference(hashlib.algorithms_available):
+        if isinstance(hash_algorithms, list) and 0 < len(hash_algorithms):
+            if set(hash_algorithms).difference(hashlib.algorithms_available):
                 raise ValueError("Included hash algorithms that are not available")
 
         self.source = source
@@ -45,20 +46,19 @@ class Syncer(object):
         self.dryrun = dryrun
         self.create = create
         self.hash_algorithms = [getattr(hashlib, algo) for algo in hash_algorithms]
-        self.blocks: Dict[str, int] = {
+        self.before = validate_callback(before, 1) if before else None
+        self.after = validate_callback(after, 1) if after else None
+        self.monitor = validate_callback(monitor, 1) if monitor else None
+        self.on_error = validate_callback(on_error, 2) if on_error else None
+        self.interval = interval
+        self.pause = pause
+
+        self._blocks: Dict[str, int] = {
             "size": 0,
             "same": 0,
             "diff": 0,
             "done": 0,
-            "delta": 0,
-            "last": 0,
         }
-        self.before = validate_callback(before, 1)
-        self.after = validate_callback(after, 1)
-        self.monitor = validate_callback(monitor, 1)
-        self.on_error = validate_callback(on_error, 2)
-        self.interval = interval
-        self.pause = pause
 
         self._suspend = False
         self._cancel = False
@@ -93,6 +93,21 @@ class Syncer(object):
         self._logger.info("Canceling...")
         return self
 
+    def start_sync(self, wait: bool = False) -> "Syncer":
+        workers = [
+            threading.Thread(target=self._sync, args=(i,))
+            for i in range(1, self.workers + 1)
+        ]
+
+        for worker in workers:
+            worker.start()
+
+        if wait:
+            for worker in workers:
+                if worker.is_alive():
+                    worker.join()
+        return self
+
     def _sync(self, worker_id: int) -> None:
         try:
             try:
@@ -122,7 +137,7 @@ class Syncer(object):
             self._logger.info("Start sync {}".format(self.destination))
 
             if self.before:
-                self.before(self.blocks)
+                self.before(self._blocks)
 
             t_last = timer()
 
@@ -135,22 +150,20 @@ class Syncer(object):
                     raise CancelSync()
 
                 if block[0] == block[1]:
-                    self.blocks["same"] += 1
+                    self._blocks["same"] += 1
                 else:
-                    self.blocks["diff"] += 1
+                    self._blocks["diff"] += 1
+
                     if not self.dryrun:
                         self.destination.execute(
                             "seek", -self.source.block_size, os.SEEK_CUR
                         ).execute("write", block[0]).execute("flush")
 
-                self.blocks["done"] = self.blocks["same"] + self.blocks["diff"]
+                self._blocks["done"] = self._blocks["same"] + self._blocks["diff"]
 
                 if self.interval <= t_last - timer():
-                    self.blocks["delta"] = self.blocks["done"] - self.blocks["last"]
-                    self.blocks["last"] = self.blocks["done"]
-
                     if self.monitor:
-                        self.monitor(self.blocks)
+                        self.monitor(self._blocks)
 
                     t_last = timer()
 
@@ -166,18 +179,14 @@ class Syncer(object):
                     time.sleep(self.pause)
 
             if self.after:
-                self.after(self.blocks)
+                self.after(self._blocks)
         except CancelSync:
             self._logger.info(
                 "[Worker {}]: synchronization task has been canceled".format(worker_id)
             )
         except Exception as e:
             if self.on_error:
-                self.on_error(e, self.blocks)
+                self.on_error(e, self._blocks)
         finally:
             self.source.do_close()
             self.destination.do_close()
-
-    @property
-    def rate(self) -> float:
-        return (self.blocks["done"] / self.blocks["size"]) * 100
