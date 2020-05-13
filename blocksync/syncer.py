@@ -65,6 +65,8 @@ class Syncer(object):
 
         self._suspend = False
         self._cancel = False
+        self._started = False
+        self._finished = False
         self._logger = blocksync_logger
 
     def __str__(self):
@@ -117,7 +119,7 @@ class Syncer(object):
                 self._blocks[block] += 1
                 self._blocks["done"] = self._blocks["same"] + self._blocks["diff"]
 
-    def _hashing(self, data: Any) -> Any:
+    def _hash(self, data: Any) -> Any:
         if 0 < len(self.hash_algorithms):
             for hash_ in self.hash_algorithms:
                 data = hash_(data)
@@ -181,7 +183,7 @@ class Syncer(object):
                         if not self.dryrun:
                             self.destination.execute(
                                 "seek", -self.source.block_size, os.SEEK_CUR
-                            ).execute("write", self._hashing(block[0])).execute("flush")
+                            ).execute("write", self._hash(block[0])).execute("flush")
 
                     if self.interval <= t_last - timer():
                         if self.monitor:
@@ -218,3 +220,11 @@ class Syncer(object):
     @property
     def rate(self) -> float:
         return (self._blocks["done"] / self._blocks["size"]) * 100
+
+    @property
+    def started(self) -> bool:
+        return self._started
+
+    @property
+    def finished(self) -> bool:
+        return self._finished
