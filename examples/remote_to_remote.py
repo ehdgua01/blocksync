@@ -10,7 +10,7 @@ source_file = blocksync.File(
     compress=False,
     port=9922,
     key_filename="",
-    cipher="blowfish-cbc"
+    cipher="blowfish-cbc",
 )
 destination_file = blocksync.File(
     "destination.file",
@@ -21,7 +21,7 @@ destination_file = blocksync.File(
     compress=True,
     port=22,
     key_filename="",
-    cipher="aes128-ctr"
+    cipher="aes128-ctr",
 )
 syncer = blocksync.Syncer(source_file, destination_file)
 syncer.start_sync()

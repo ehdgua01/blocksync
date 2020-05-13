@@ -10,7 +10,7 @@ source_file = blocksync.File(
     compress=True,
     port=22,
     key_filename="",
-    cipher="aes128-ctr"
+    cipher="aes128-ctr",
 )
 destination_file = blocksync.File("destination.file")
 syncer = blocksync.Syncer(source_file, destination_file)

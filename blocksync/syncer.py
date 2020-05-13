@@ -62,6 +62,7 @@ class Syncer(object):
             "diff": 0,
             "done": 0,
         }
+        self._workers: List[threading.Thread] = []
 
         self._suspend = False
         self._cancel = False
@@ -98,19 +99,22 @@ class Syncer(object):
         self._logger.info("Canceling...")
         return self
 
+    def wait(self) -> "Syncer":
+        if self._started and 0 < len(self._workers):
+            self._run_alive_workers()
+        return self
+
     def start_sync(self, wait: bool = True) -> "Syncer":
-        workers = [
+        self._workers = [
             threading.Thread(target=self._sync, args=(i,))
             for i in range(1, self.workers + 1)
         ]
 
-        for worker in workers:
+        for worker in self._workers:
             worker.start()
 
         if wait:
-            for worker in workers:
-                if worker.is_alive():
-                    worker.join()
+            self._run_alive_workers()
         return self
 
     def _add_block(self, block: str) -> None:
@@ -124,6 +128,10 @@ class Syncer(object):
             for hash_ in self.hash_algorithms:
                 data = hash_(data)
         return data
+
+    def _run_alive_workers(self) -> None:
+        for worker in [w for w in self._workers if w.is_alive()]:
+            worker.join()
 
     def _sync(self, worker_id: int) -> None:
         try:
@@ -173,7 +181,11 @@ class Syncer(object):
                         )
 
                     if self._cancel:
-                        raise CancelSync()
+                        raise CancelSync(
+                            "[Worker {}]: synchronization task has been canceled".format(
+                                worker_id
+                            )
+                        )
 
                     if block[0] == block[1]:
                         self._add_block("same")
@@ -204,12 +216,8 @@ class Syncer(object):
 
                 if self.after:
                     self.after(self._blocks)
-            except CancelSync:
-                self._logger.info(
-                    "[Worker {}]: synchronization task has been canceled".format(
-                        worker_id
-                    )
-                )
+            except CancelSync as e:
+                self._logger.info(e)
             except Exception as e:
                 if self.on_error:
                     self.on_error(e, self._blocks)

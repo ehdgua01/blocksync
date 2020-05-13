@@ -11,7 +11,7 @@ destination_file = blocksync.File(
     compress=True,
     port=22,
     key_filename="",
-    cipher="aes128-ctr"
+    cipher="aes128-ctr",
 )
 syncer = blocksync.Syncer(source_file, destination_file)
 syncer.start_sync()
