@@ -11,6 +11,7 @@ Features
 * Supports SCP-like behavior. (local-local, local-remote, remote-local, remote-remote)
 * Support for callbacks that can run just before, after, and during synchronization of files
 * Support for synchronization suspend/resume, cancel.
+* Most methods support method chaining.
 * You can see the overall progress in a multi-threaded environment.
 * You can proceed synchronization in the background.
 * You can multi hash when storing data. (by `hashlib`_)
