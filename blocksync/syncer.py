@@ -113,6 +113,8 @@ class Syncer(object):
         for worker in self._workers:
             worker.start()
 
+        self._started = True
+
         if wait:
             self._run_alive_workers()
         return self
@@ -132,6 +134,7 @@ class Syncer(object):
     def _run_alive_workers(self) -> None:
         for worker in [w for w in self._workers if w.is_alive()]:
             worker.join()
+        self._finished = True
 
     def _sync(self, worker_id: int) -> None:
         try:
