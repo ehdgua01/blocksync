@@ -67,7 +67,6 @@ class Syncer(object):
         self._suspend = False
         self._cancel = False
         self._started = False
-        self._finished = False
         self._logger = blocksync_logger
 
     def __str__(self):
@@ -132,9 +131,8 @@ class Syncer(object):
         return data
 
     def _run_alive_workers(self) -> None:
-        for worker in [w for w in self._workers if w.is_alive()]:
+        for worker in self._alive_workers:
             worker.join()
-        self._finished = True
 
     def _sync(self, worker_id: int) -> None:
         try:
@@ -233,9 +231,15 @@ class Syncer(object):
         return (self._blocks["done"] / self._blocks["size"]) * 100
 
     @property
+    def _alive_workers(self) -> List[threading.Thread]:
+        return [w for w in self._workers if w.is_alive()]
+
+    @property
     def started(self) -> bool:
         return self._started
 
     @property
     def finished(self) -> bool:
-        return self._finished
+        if self._started and len(self._alive_workers) < 1:
+            return True
+        return False
