@@ -10,7 +10,7 @@ setuptools.setup(
     version="0.2.2",
     author="ehdgua01",
     author_email="ehdgua01@gmail.com",
-    licese="MIT License",
+    license="MIT License",
     description="Synchronize (large) files to a destination (local/remote) using a incremental algorithm",
     long_description=long_description,
     long_description_content_type="text/x-rst",
