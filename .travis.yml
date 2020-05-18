@@ -1,12 +1,18 @@
 language: python
+
 python: "3.8"
+
 cache: pip
+
 install:
-  - pip install -r dev-requirements.txt
+  - .travis/install.sh
+
 before_script:
   - black --check .
+
 script:
   - flake8 .
+
 deploy:
   provider: pypi
   username: $PYPI_USERNAME
