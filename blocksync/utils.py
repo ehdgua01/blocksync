@@ -10,7 +10,9 @@ def validate_callback(c: Callable, n: int = 0):
 
         if len(sig.parameters) < n:
             raise TypeError(
-                "{} least required {} arguments, but {}".format(c, n, len(sig.parameters))
+                "{} least required {} arguments, but {}".format(
+                    c, n, len(sig.parameters)
+                )
             )
         return c
     raise TypeError("{} is not callable".format(c))
