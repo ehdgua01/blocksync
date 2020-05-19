@@ -12,6 +12,10 @@ before_script:
 
 script:
   - flake8 .
+  - pytest
+
+after_script:
+  - codecov
 
 deploy:
   provider: pypi

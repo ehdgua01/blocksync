@@ -3,3 +3,6 @@ black
 flake8
 pyflakes>=2.2.0
 twine
+pytest
+pytest-cov
+codecov
