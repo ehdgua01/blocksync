@@ -7,7 +7,7 @@ with open("README.rst", "r") as f:
 
 setuptools.setup(
     name="blocksync",
-    version="0.2.2",
+    version="0.3.0",
     author="ehdgua01",
     author_email="ehdgua01@gmail.com",
     license="MIT License",
