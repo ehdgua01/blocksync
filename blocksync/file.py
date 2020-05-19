@@ -21,7 +21,7 @@ class File(object):
         port: int = SSH_PORT,
         username: str = None,
         password: str = None,
-        key_filename: Union[PurePath, str] = "",
+        key_filename: Union[PurePath, str] = None,
         compress: bool = True,
         cipher: str = "aes128-ctr",
     ) -> None:
