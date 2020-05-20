@@ -110,7 +110,7 @@ class File(object):
             if block := self._local.io.read(self.block_size):
                 yield block
             else:
-                break
+                break  # pragma: no cover
 
     def execute(self, operation, *args, **kwargs) -> "File":
         self._execute(operation, *args, **kwargs)
