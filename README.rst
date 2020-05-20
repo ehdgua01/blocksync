@@ -3,6 +3,12 @@ blocksync
 
 Blocksync Python package allows `blocksync script`_ to be used as Python packages, and supports more convenient and diverse functions than blocksync script.
 
+.. image:: https://travis-ci.com/ehdgua01/blocksync.svg?branch=master
+    :target: https://travis-ci.com/ehdgua01/blocksync
+
+.. image:: https://codecov.io/gh/ehdgua01/blocksync/branch/master/graph/badge.svg
+    :target: https://codecov.io/gh/ehdgua01/blocksync
+
 .. _blocksync script: http://https://github.com/theraser/blocksync
 
 Features
