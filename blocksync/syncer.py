@@ -69,11 +69,6 @@ class Syncer(object):
         self._started = False
         self._logger = blocksync_logger
 
-    def __str__(self):
-        return "<blocksync.Syncer source={} destination={}>".format(
-            self.source, self.destination
-        )
-
     def __repr__(self):
         return "<blocksync.Syncer source={} destination={}>".format(
             self.source, self.destination

@@ -49,11 +49,6 @@ class File(object):
 
         self._local = threading.local()
 
-    def __str__(self):
-        return "<blocksync.File path={} block_size={} state={}>".format(
-            self.path, self.block_size, "opened" if self.opened else "closed",
-        )
-
     def __repr__(self):
         return "<blocksync.File path={} block_size={} state={}>".format(
             self.path, self.block_size, "opened" if self.opened else "closed",
@@ -68,16 +63,19 @@ class File(object):
             self._local.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy)
             self._local.ssh.load_system_host_keys()
             self._local.ssh.connect(**self.ssh_options)
-        elif isinstance(session, paramiko.SSHClient):
-            self._local.ssh = session
-        else:
+        elif not isinstance(session, paramiko.SSHClient):
             raise ValueError("Session isn't instance of paramiko.SSHClient")
+        elif session.get_transport() is None or not session.get_transport().is_active():
+            raise ValueError("This session is not connected")
+        else:
+            self._local.ssh = session
 
         self._local.sftp = self._local.ssh.open_sftp()
         return self
 
     def close_sftp(self) -> "File":
-        if isinstance(self._local.ssh, paramiko.SSHClient) and self.connected:
+        if self.connected:
+            self._local.sftp.close()
             self._local.ssh.close()
         return self
 
@@ -97,17 +95,14 @@ class File(object):
         self.execute("seek", os.SEEK_SET)
         return self
 
-    def do_close(self, flush=True) -> "File":
-        try:
-            if self.opened:
-                if flush:
-                    self._local.io.flush()
-                self._local.io.close()
+    def do_close(self, flush=True, close_sftp=True) -> "File":
+        if self.opened:
+            if flush:
+                self._local.io.flush()
+            self._local.io = None
 
-            if self.remote and self.connected:
-                self.close_sftp()
-        except:
-            pass
+        if self.remote and self.connected and close_sftp:
+            self.close_sftp()
         return self
 
     def get_blocks(self) -> Any:
@@ -143,7 +138,7 @@ class File(object):
         if (
             getattr(self._local, "ssh", False)
             and isinstance(self._local.ssh, paramiko.SSHClient)
-            and self._local.ssh.get_transport()
+            and self._local.ssh.get_transport() is not None
         ):
             return self._local.ssh.get_transport().is_active()
         return False
