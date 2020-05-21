@@ -9,7 +9,7 @@ def validate_callback(c: Callable, n: int = 0):
         sig = signature(c)
 
         if len(sig.parameters) < n:
-            raise TypeError(
+            raise ValueError(
                 "{} least required {} arguments, but {}".format(
                     c, n, len(sig.parameters)
                 )

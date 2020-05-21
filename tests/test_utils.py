@@ -10,7 +10,7 @@ class TestCase(unittest.TestCase):
 
         self.assertEqual(validate_callback(func, 3), func)
 
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ValueError):
             # If you need a function that requires 4 arguments
             validate_callback(func, 4)
 
