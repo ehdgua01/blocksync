@@ -3,7 +3,7 @@ import string
 from inspect import signature
 from typing import Callable
 
-__all__ = ["validate_callback"]
+__all__ = ["validate_callback", "generate_random_data"]
 
 
 def validate_callback(c: Callable, n: int = 0) -> bool:

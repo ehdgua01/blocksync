@@ -1,8 +1,6 @@
 import pathlib
 import unittest
 import paramiko
-import random
-import string
 
 from blocksync import File
 from blocksync.consts import UNITS
