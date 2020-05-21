@@ -3,6 +3,7 @@ import logging
 import hashlib
 import time
 import threading
+import inspect
 from timeit import default_timer as timer
 from typing import List, Dict, Callable, Any, Union
 
@@ -48,18 +49,14 @@ class Syncer(object):
 
     def set_source(self, source: File) -> "Syncer":
         if not isinstance(source, File):
-            raise TypeError(
-                "Source isn't instance of blocksync.File"
-            )
+            raise TypeError("Source isn't instance of blocksync.File")
         self._source = source
         return self
 
     def set_destination(self, destination: File) -> "Syncer":
         if not isinstance(destination, File):
-            raise TypeError(
-                "Destination isn't instance of blocksync.File"
-            )
-        self._source = destination
+            raise TypeError("Destination isn't instance of blocksync.File")
+        self._destination = destination
         return self
 
     def set_callbacks(
@@ -91,6 +88,12 @@ class Syncer(object):
         return self
 
     def set_logger(self, logger: logging.Logger) -> "Syncer":
+        if inspect.isclass(logger):
+            logger = logger(__name__)
+
+        if not isinstance(logger, logging.Logger):
+            raise TypeError("Logger isn't instance of logging.Logger")
+
         self._logger = logger
         return self
 
