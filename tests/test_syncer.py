@@ -1,13 +1,22 @@
 import unittest
+import unittest.mock
 import logging
+import pathlib
 
-from blocksync import Syncer
-from blocksync import File
+from blocksync import Syncer, File
+from blocksync.utils import generate_random_data
+from blocksync.consts import UNITS
 
 
 class TestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.syncer = Syncer()
+        self.source = File("source.file")
+        self.destination = File("destination.file")
+
+    def tearDown(self) -> None:
+        pathlib.Path(self.source.path).unlink(missing_ok=True)
+        pathlib.Path(self.destination.path).unlink(missing_ok=True)
 
     def test_set_source(self) -> None:
         with self.assertRaises(TypeError):
@@ -83,3 +92,49 @@ class TestCase(unittest.TestCase):
         self.assertEqual(self.syncer.set_logger(logging.Logger), self.syncer)
 
         self.assertEqual(self.syncer.set_logger(logging.Logger(__name__)), self.syncer)
+
+    def test_start_sync(self) -> None:
+        with self.assertRaises(AttributeError):
+            self.syncer.start_sync()
+
+        self.syncer.set_source(self.source)
+
+        with self.assertRaises(AttributeError):
+            self.syncer.start_sync()
+
+        self.syncer.set_destination(self.destination)
+
+        with self.assertRaises(TypeError):
+            self.syncer.start_sync(interval="xxx")
+
+        with self.assertRaises(TypeError):
+            self.syncer.start_sync(pause="xxx")
+
+        size = UNITS["MiB"] * 10
+        self.source.do_create(size)
+        self.destination.do_create(size)
+        self.source.do_open().execute(
+            "write", generate_random_data(size).encode()
+        ).execute("flush")
+        self.source.do_close()
+        self.destination.do_close()
+
+        mock_before = unittest.mock.MagicMock()
+        mock_after = unittest.mock.MagicMock()
+        mock_monitor = unittest.mock.MagicMock()
+
+        self.assertEqual(
+            self.syncer.set_callbacks(
+                before=mock_before, after=mock_after, monitor=mock_monitor
+            ),
+            self.syncer,
+        )
+        self.assertEqual(self.syncer.start_sync(interval=0).started, True)
+        self.assertEqual(self.syncer.wait(), self.syncer)
+        self.assertEqual(self.syncer.finished, True)
+        self.assertEqual(
+            self.syncer.blocks, {"size": size, "same": 0, "diff": 10, "done": 10}
+        )
+        mock_before.assert_called()
+        mock_after.assert_called()
+        mock_monitor.assert_called()
