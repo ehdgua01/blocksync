@@ -4,7 +4,7 @@ import hashlib
 import time
 import threading
 from timeit import default_timer as timer
-from typing import List, Dict, Callable, Any
+from typing import List, Dict, Callable, Any, Union
 
 from blocksync.file import File
 from blocksync.utils import validate_callback
@@ -16,47 +16,16 @@ blocksync_logger = logging.getLogger(__name__)
 
 
 class Syncer(object):
-    def __init__(
-        self,
-        source: File,
-        destination: File,
-        workers: int = 1,
-        dryrun: bool = False,
-        create: bool = False,
-        hash_algorithms: List[str] = None,
-        before: Callable = None,
-        after: Callable = None,
-        monitor: Callable = None,
-        on_error: Callable = None,
-        interval: int = 5,
-        pause: float = 0.5,
-    ) -> None:
-        if not (isinstance(source, File) and isinstance(destination, File)):
-            raise TypeError(
-                "Source or(or both) Destination isn't instance of blocksync.File"
-            )
-
-        self.source = source
-        self.destination = destination
-        self.hash_algorithms: List[Callable] = []
-
-        if isinstance(hash_algorithms, list) and 0 < len(hash_algorithms):
-            if set(hash_algorithms).difference(hashlib.algorithms_available):
-                raise ValueError("Included hash algorithms that are not available")
-            self.hash_algorithms = [getattr(hashlib, algo) for algo in hash_algorithms]
-
-        # options for synchronize
-        self.workers = workers
-        self.dryrun = dryrun
-        self.create = create
-        self.interval = interval
-        self.pause = pause
+    def __init__(self) -> None:
+        self._source = None
+        self._destination = None
+        self._hash_algorithms: List[Callable] = []
 
         # callbacks
-        self.before = validate_callback(before, 1) if before else None
-        self.after = validate_callback(after, 1) if after else None
-        self.monitor = validate_callback(monitor, 1) if monitor else None
-        self.on_error = validate_callback(on_error, 2) if on_error else None
+        self._before = None
+        self._after = None
+        self._monitor = None
+        self._on_error = None
 
         # internal attributes or properties
         self._lock = threading.Lock()
@@ -66,16 +35,60 @@ class Syncer(object):
             "diff": 0,
             "done": 0,
         }
-        self._workers: List[threading.Thread] = []
+        self._worker_threads: List[threading.Thread] = []
         self._suspend = False
         self._cancel = False
         self._started = False
         self._logger = blocksync_logger
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<blocksync.Syncer source={} destination={}>".format(
             self.source, self.destination
         )
+
+    def set_source(self, source: File) -> "Syncer":
+        if not isinstance(source, File):
+            raise TypeError(
+                "Source isn't instance of blocksync.File"
+            )
+        self._source = source
+        return self
+
+    def set_destination(self, destination: File) -> "Syncer":
+        if not isinstance(destination, File):
+            raise TypeError(
+                "Destination isn't instance of blocksync.File"
+            )
+        self._source = destination
+        return self
+
+    def set_callbacks(
+        self,
+        before: Callable = None,
+        after: Callable = None,
+        monitor: Callable = None,
+        on_error: Callable = None,
+    ) -> "Syncer":
+        if before and validate_callback(before, 1):
+            self._before = before
+
+        if after and validate_callback(after, 1):
+            self._after = after
+
+        if monitor and validate_callback(monitor, 1):
+            self._monitor = monitor
+
+        if on_error and validate_callback(on_error, 2):
+            self._on_error = on_error
+        return self
+
+    def set_hash_algorithms(self, hash_algorithms: List[str]) -> "Syncer":
+        if isinstance(hash_algorithms, list) and 0 < len(hash_algorithms):
+            if set(hash_algorithms).difference(hashlib.algorithms_available):
+                raise ValueError("Included hash algorithms that are not available")
+
+            self._hash_algorithms = [getattr(hashlib, algo) for algo in hash_algorithms]
+        return self
 
     def set_logger(self, logger: logging.Logger) -> "Syncer":
         self._logger = logger
@@ -97,17 +110,35 @@ class Syncer(object):
         return self
 
     def wait(self) -> "Syncer":
-        if self._started and 0 < len(self._workers):
+        if self._started and 0 < len(self._worker_threads):
             self._run_alive_workers()
         return self
 
-    def start_sync(self, wait: bool = True) -> "Syncer":
-        self._workers = [
-            threading.Thread(target=self._sync, args=(i,))
-            for i in range(1, self.workers + 1)
+    def start_sync(
+        self,
+        workers: int = 1,
+        wait: bool = True,
+        dryrun: bool = False,
+        create: bool = False,
+        interval: Union[float, int] = 5,
+        pause: Union[float, int] = 0.5,
+    ) -> "Syncer":
+        if not self.source:
+            raise AttributeError("Source is not assigned.")
+        elif not self.destination:
+            raise AttributeError("Destination is not assigned.")
+
+        if not (isinstance(interval, (float, int)) and isinstance(pause, (float, int))):
+            raise TypeError("Interval and pause requires float or int type")
+
+        self._worker_threads = [
+            threading.Thread(
+                target=self._sync, args=(i, workers, dryrun, create, interval, pause)
+            )
+            for i in range(1, workers + 1)
         ]
 
-        for worker in self._workers:
+        for worker in self._worker_threads:
             worker.start()
 
         self._started = True
@@ -123,32 +154,41 @@ class Syncer(object):
                 self._blocks["done"] = self._blocks["same"] + self._blocks["diff"]
 
     def _hash(self, data: Any) -> Any:
-        if 0 < len(self.hash_algorithms):
-            for hash_ in self.hash_algorithms:
+        if 0 < len(self._hash_algorithms):
+            for hash_ in self._hash_algorithms:
                 data = hash_(data)
         return data
 
-    def _run_alive_workers(self) -> None:
+    def _run_alive_workers(self) -> "Syncer":
         for worker in self._alive_workers:
             worker.join()
+        return self
 
-    def _sync(self, worker_id: int) -> None:
+    def _sync(
+        self,
+        worker_id: int,
+        workers: int,
+        dryrun: bool = False,
+        create: bool = False,
+        interval: Union[float, int] = 5,
+        pause: Union[float, int] = 0.5,
+    ) -> None:
         try:
             try:
                 self.source.do_open()
                 self.destination.do_open()
             except FileNotFoundError:
-                if self.create:
+                if create:
                     self.destination.do_create(self.source.do_open().size).do_open()
                 else:
-                    raise FileNotFoundError()
+                    raise FileNotFoundError
 
             if self.source.size != self.destination.size:
                 raise ValueError("size not same")
             elif self._blocks["size"] == -1:
                 self._blocks["size"] = self.source.size
 
-            chunk_size = self.source.size // self.workers
+            chunk_size = self.source.size // workers
             end_pos = chunk_size * worker_id
 
             if 1 < worker_id:
@@ -156,8 +196,8 @@ class Syncer(object):
                 self.source.execute("seek", start_pos, os.SEEK_SET)
                 self.destination.execute("seek", start_pos, os.SEEK_SET)
 
-                if worker_id == self.workers:
-                    end_pos += self.source.size % self.workers
+                if worker_id == workers:
+                    end_pos += self.source.size % workers
 
             if self.source.block_size != self.destination.block_size:
                 self.destination.block_size = self.source.block_size
@@ -174,7 +214,7 @@ class Syncer(object):
                     self.source.get_blocks(), self.destination.get_blocks()
                 ):
                     while self._suspend:
-                        time.sleep(self.pause)
+                        time.sleep(pause)
                         self._logger.info(
                             "[Worker {}]: Suspending...".format(worker_id)
                         )
@@ -191,12 +231,12 @@ class Syncer(object):
                     else:
                         self._add_block("diff")
 
-                        if not self.dryrun:
+                        if not dryrun:
                             self.destination.execute(
                                 "seek", -self.source.block_size, os.SEEK_CUR
                             ).execute("write", self._hash(block[0])).execute("flush")
 
-                    if self.interval <= t_last - timer():
+                    if interval <= t_last - timer():
                         if self.monitor:
                             self.monitor(self._blocks)
 
@@ -210,8 +250,8 @@ class Syncer(object):
                         )
                         break
 
-                    if 0 < self.pause:
-                        time.sleep(self.pause)
+                    if 0 < pause:
+                        time.sleep(pause)
 
                 if self.after:
                     self.after(self._blocks)
@@ -225,12 +265,16 @@ class Syncer(object):
             self.destination.do_close()
 
     @property
-    def rate(self) -> float:
-        return (self._blocks["done"] / self._blocks["size"]) * 100
+    def source(self) -> File:
+        return self._source
 
     @property
-    def _alive_workers(self) -> List[threading.Thread]:
-        return [w for w in self._workers if w.is_alive()]
+    def destination(self) -> File:
+        return self._destination
+
+    @property
+    def rate(self) -> float:
+        return (self._blocks["done"] / self._blocks["size"]) * 100
 
     @property
     def started(self) -> bool:
@@ -241,3 +285,23 @@ class Syncer(object):
         if self._started and len(self._alive_workers) < 1:
             return True
         return False
+
+    @property
+    def before(self) -> Union[Callable, None]:
+        return self._before
+
+    @property
+    def after(self) -> Union[Callable, None]:
+        return self._after
+
+    @property
+    def monitor(self) -> Union[Callable, None]:
+        return self._monitor
+
+    @property
+    def on_error(self) -> Union[Callable, None]:
+        return self._on_error
+
+    @property
+    def _alive_workers(self) -> List[threading.Thread]:
+        return [w for w in self._worker_threads if w.is_alive()]
