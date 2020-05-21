@@ -32,29 +32,33 @@ class Syncer(object):
         pause: float = 0.5,
     ) -> None:
         if not (isinstance(source, File) and isinstance(destination, File)):
-            raise ValueError(
+            raise TypeError(
                 "Source or(or both) Destination isn't instance of blocksync.File"
             )
+
+        self.source = source
+        self.destination = destination
+        self.hash_algorithms: List[Callable] = []
 
         if isinstance(hash_algorithms, list) and 0 < len(hash_algorithms):
             if set(hash_algorithms).difference(hashlib.algorithms_available):
                 raise ValueError("Included hash algorithms that are not available")
+            self.hash_algorithms = [getattr(hashlib, algo) for algo in hash_algorithms]
 
-        self.source = source
-        self.destination = destination
+        # options for synchronize
         self.workers = workers
         self.dryrun = dryrun
         self.create = create
-        self.hash_algorithms: List[Callable] = [
-            getattr(hashlib, algo) for algo in hash_algorithms
-        ] if hash_algorithms else []
+        self.interval = interval
+        self.pause = pause
+
+        # callbacks
         self.before = validate_callback(before, 1) if before else None
         self.after = validate_callback(after, 1) if after else None
         self.monitor = validate_callback(monitor, 1) if monitor else None
         self.on_error = validate_callback(on_error, 2) if on_error else None
-        self.interval = interval
-        self.pause = pause
 
+        # internal attributes or properties
         self._lock = threading.Lock()
         self._blocks: Dict[str, int] = {
             "size": -1,
@@ -63,7 +67,6 @@ class Syncer(object):
             "done": 0,
         }
         self._workers: List[threading.Thread] = []
-
         self._suspend = False
         self._cancel = False
         self._started = False
