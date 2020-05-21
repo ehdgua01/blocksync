@@ -10,6 +10,7 @@ from typing import List, Dict, Callable, Any, Union
 from blocksync.file import File
 from blocksync.utils import validate_callback
 from blocksync.interrupt import CancelSync
+from blocksync.consts import UNITS
 
 __all__ = ["Syncer"]
 
@@ -42,7 +43,7 @@ class Syncer(object):
         self._started = False
         self._logger = blocksync_logger
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         return "<blocksync.Syncer source={} destination={}>".format(
             self.source, self.destination
         )
@@ -120,6 +121,7 @@ class Syncer(object):
     def start_sync(
         self,
         workers: int = 1,
+        block_size: int = UNITS["MiB"],
         wait: bool = True,
         dryrun: bool = False,
         create: bool = False,
@@ -136,7 +138,8 @@ class Syncer(object):
 
         self._worker_threads = [
             threading.Thread(
-                target=self._sync, args=(i, workers, dryrun, create, interval, pause)
+                target=self._sync,
+                args=(i, workers, block_size, dryrun, create, interval, pause),
             )
             for i in range(1, workers + 1)
         ]
@@ -171,6 +174,7 @@ class Syncer(object):
         self,
         worker_id: int,
         workers: int,
+        block_size: int,
         dryrun: bool = False,
         create: bool = False,
         interval: Union[float, int] = 5,
@@ -202,9 +206,6 @@ class Syncer(object):
                 if worker_id == workers:
                     end_pos += self.source.size % workers
 
-            if self.source.block_size != self.destination.block_size:
-                self.destination.block_size = self.source.block_size
-
             self._logger.info("Start sync {}".format(self.destination))
 
             if self.before:
@@ -214,13 +215,14 @@ class Syncer(object):
 
             try:
                 for block in zip(
-                    self.source.get_blocks(), self.destination.get_blocks()
+                    self.source.get_blocks(block_size),
+                    self.destination.get_blocks(block_size),
                 ):
                     while self._suspend:
-                        time.sleep(pause)
                         self._logger.info(
                             "[Worker {}]: Suspending...".format(worker_id)
                         )
+                        time.sleep(pause)
 
                     if self._cancel:
                         raise CancelSync(
@@ -236,10 +238,10 @@ class Syncer(object):
 
                         if not dryrun:
                             self.destination.execute(
-                                "seek", -self.source.block_size, os.SEEK_CUR
+                                "seek", -block_size, os.SEEK_CUR
                             ).execute("write", self._hash(block[0])).execute("flush")
 
-                    if interval <= t_last - timer():
+                    if interval <= timer() - t_last:
                         if self.monitor:
                             self.monitor(self._blocks)
 
@@ -274,6 +276,10 @@ class Syncer(object):
     @property
     def destination(self) -> File:
         return self._destination
+
+    @property
+    def blocks(self) -> Dict[str, int]:
+        return self._blocks
 
     @property
     def rate(self) -> float:

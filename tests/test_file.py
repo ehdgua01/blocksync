@@ -43,20 +43,20 @@ class TestCase(unittest.TestCase):
         self.assertEqual(self.remote_file.close_sftp(), self.remote_file)
         self.assertFalse(self.remote_file.connected)
 
-    def test_create_a_1MB_local_file(self) -> None:
-        self.assertEqual(self.local_file.do_create(UNITS["MB"]), self.local_file)
+    def test_create_a_1MiB_local_file(self) -> None:
+        self.assertEqual(self.local_file.do_create(UNITS["MiB"]), self.local_file)
 
         __local_file = pathlib.Path("local.file")
 
-        self.assertEqual(__local_file.stat().st_size, UNITS["MB"])
+        self.assertEqual(__local_file.stat().st_size, UNITS["MiB"])
 
-    def test_create_a_1MB_remote_file(self) -> None:
-        self.assertEqual(self.remote_file.do_create(UNITS["MB"]), self.remote_file)
+    def test_create_a_1MiB_remote_file(self) -> None:
+        self.assertEqual(self.remote_file.do_create(UNITS["MiB"]), self.remote_file)
 
         if self.remote_file.connected:
             self.assertEqual(
                 self.remote_file._local.sftp.stat(self._remote_path).st_size,
-                UNITS["MB"],
+                UNITS["MiB"],
             )
 
     def test_open_and_close_local_file(self) -> None:
@@ -92,8 +92,8 @@ class TestCase(unittest.TestCase):
         self.assertFalse(self.remote_file.opened)
         self.assertTrue(self.remote_file.connected)
 
-    def test_write_and_get_1MB_blocks(self) -> None:
-        write_data = generate_random_data(UNITS["MB"]).encode()
+    def test_write_and_get_1MiB_blocks(self) -> None:
+        write_data = generate_random_data(UNITS["MiB"]).encode()
 
         self.remote_file.do_create().do_open().execute("write", write_data).execute(
             "flush"

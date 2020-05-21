@@ -14,7 +14,6 @@ class File(object):
     def __init__(
         self,
         path: Union[PurePath, str],
-        block_size: int = UNITS["MiB"],
         start_pos: int = os.SEEK_SET,
         remote: bool = False,
         hostname: str = None,
@@ -31,7 +30,6 @@ class File(object):
             raise ValueError("Invalid ssh encryption algorithm")
 
         self.path = path
-        self.block_size = block_size
         self.start_pos = start_pos
         self.size: int = 0
         self.remote = remote
@@ -50,8 +48,8 @@ class File(object):
         self._local = threading.local()
 
     def __repr__(self):
-        return "<blocksync.File path={} block_size={} state={}>".format(
-            self.path, self.block_size, "opened" if self.opened else "closed",
+        return "<blocksync.File path={} state={}>".format(
+            self.path, "opened" if self.opened else "closed",
         )
 
     def open_sftp(self, session: paramiko.SSHClient = None) -> "File":
@@ -105,9 +103,9 @@ class File(object):
             self.close_sftp()
         return self
 
-    def get_blocks(self) -> Any:
+    def get_blocks(self, block_size: int = UNITS["MiB"]) -> Any:
         while self.opened:
-            if block := self._local.io.read(self.block_size):
+            if block := self._local.io.read(block_size):
                 yield block
             else:
                 break  # pragma: no cover
