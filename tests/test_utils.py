@@ -8,7 +8,7 @@ class TestCase(unittest.TestCase):
         def func(a, b, c):
             pass
 
-        self.assertEqual(validate_callback(func, 3), func)
+        self.assertEqual(validate_callback(func, 3), True)
 
         with self.assertRaises(ValueError):
             # If you need a function that requires 4 arguments

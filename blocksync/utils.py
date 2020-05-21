@@ -4,7 +4,7 @@ from typing import Callable
 __all__ = ["validate_callback"]
 
 
-def validate_callback(c: Callable, n: int = 0):
+def validate_callback(c: Callable, n: int = 0) -> bool:
     if callable(c):
         sig = signature(c)
 
@@ -14,5 +14,5 @@ def validate_callback(c: Callable, n: int = 0):
                     c, n, len(sig.parameters)
                 )
             )
-        return c
+        return True
     raise TypeError("{} is not callable".format(c))
