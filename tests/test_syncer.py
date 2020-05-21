@@ -29,14 +29,10 @@ class TestCase(unittest.TestCase):
         for callback in ["before", "after", "monitor", "on_error"]:
             with self.subTest():
                 with self.assertRaises(TypeError):
-                    self.syncer.set_callbacks(
-                        **{callback: "xxx",}
-                    )
+                    self.syncer.set_callbacks(**{callback: "xxx"})
 
                 with self.assertRaises(ValueError):
-                    self.syncer.set_callbacks(
-                        **{callback: lambda: None,}
-                    )
+                    self.syncer.set_callbacks(**{callback: lambda: None})
 
         # before callback least requires 1 argument
         def before(x):
@@ -77,8 +73,10 @@ class TestCase(unittest.TestCase):
         self.assertEqual(self.syncer.set_hash_algorithms(["sha256"]), self.syncer)
 
     def test_set_logger(self) -> None:
-        with self.assertRaises(TypeError):
-            self.syncer.set_logger("xxx")
+        for logger in ["xxx", object]:
+            with self.subTest():
+                with self.assertRaises(TypeError):
+                    self.syncer.set_logger(logger)
 
         # possible to pass class by argument.
         # but the logger will be named by __name__

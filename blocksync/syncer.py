@@ -88,7 +88,7 @@ class Syncer(object):
         return self
 
     def set_logger(self, logger: logging.Logger) -> "Syncer":
-        if inspect.isclass(logger):
+        if inspect.isclass(logger) and logger == logging.Logger:
             logger = logger(__name__)
 
         if not isinstance(logger, logging.Logger):
