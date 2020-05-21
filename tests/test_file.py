@@ -6,6 +6,7 @@ import string
 
 from blocksync import File
 from blocksync.consts import UNITS
+from blocksync.utils import generate_random_data
 
 
 class TestCase(unittest.TestCase):
@@ -20,8 +21,7 @@ class TestCase(unittest.TestCase):
         )
 
     def tearDown(self) -> None:
-        __local_file = pathlib.Path(self._local_path)
-        __local_file.unlink(missing_ok=True)
+        pathlib.Path(self._local_path).unlink(missing_ok=True)
 
         if self.remote_file.connected:
             try:
@@ -92,10 +92,8 @@ class TestCase(unittest.TestCase):
         self.assertFalse(self.remote_file.opened)
         self.assertTrue(self.remote_file.connected)
 
-    def test_write_and_get_1MB_blocks(self):
-        write_data = "".join(
-            random.choices(string.ascii_uppercase + string.digits, k=UNITS["MB"])
-        ).encode()
+    def test_write_and_get_1MB_blocks(self) -> None:
+        write_data = generate_random_data(UNITS["MB"]).encode()
 
         self.remote_file.do_create().do_open().execute("write", write_data).execute(
             "flush"
