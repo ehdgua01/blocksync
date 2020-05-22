@@ -93,7 +93,7 @@ class File(object):
         if self.opened:
             if flush:
                 self._local.io.flush()
-            self._local.io = None
+            self._local.io.close()
 
         if self.remote and self.connected and close_sftp:
             self.close_sftp()
@@ -130,7 +130,7 @@ class File(object):
     @property
     def connected(self) -> bool:
         if (
-            getattr(self._local, "ssh", False)
+            hasattr(self._local, "ssh")
             and isinstance(self._local.ssh, paramiko.SSHClient)
             and self._local.ssh.get_transport() is not None
         ):
@@ -139,11 +139,11 @@ class File(object):
 
     @property
     def opened(self) -> bool:
-        try:
-            self._local.io.tell()
-            return True
-        except:
-            return False
+        if hasattr(self._local, "io"):
+            if hasattr(self._local.io, "_closed"):
+                return not self._local.io._closed
+            return not self._local.io.closed
+        return False
 
     @property
     def size(self) -> int:

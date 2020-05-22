@@ -31,7 +31,7 @@ class TestCase(unittest.TestCase):
 
     def test_open_sftp_and_close_sftp(self) -> None:
         self.assertFalse(self.remote_file.connected)
-        self.assertFalse(getattr(self.remote_file._local, "ssh", False))
+        self.assertFalse(hasattr(self.remote_file._local, "ssh"))
 
         self.assertEqual(self.remote_file.open_sftp(), self.remote_file)
 
