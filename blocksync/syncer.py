@@ -120,9 +120,7 @@ class Syncer(object):
         return self
 
     def reset_blocks(self) -> "Syncer":
-        self._blocks.update(
-            {"size": -1, "same": 0, "diff": 0, "done": 0}
-        )
+        self._blocks.update({"size": -1, "same": 0, "diff": 0, "done": 0})
         return self
 
     def start_sync(
