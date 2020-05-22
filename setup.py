@@ -7,7 +7,7 @@ with open("README.rst", "r") as f:
 
 setuptools.setup(
     name="blocksync",
-    version="0.4.1",
+    version="1.0.0",
     author="ehdgua01",
     author_email="ehdgua01@gmail.com",
     license="MIT License",
@@ -21,7 +21,7 @@ setuptools.setup(
     install_requires=["paramiko"],
     python_requires=">=3.8",
     classifiers=[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Production/Stable",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.8",
