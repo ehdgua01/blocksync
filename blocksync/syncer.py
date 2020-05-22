@@ -31,6 +31,7 @@ class Syncer(object):
 
         # internal attributes or properties
         self._lock = threading.Lock()
+        self._event = threading.Event()
         self._blocks: Dict[str, int] = {
             "size": -1,
             "same": 0,
@@ -122,11 +123,11 @@ class Syncer(object):
         self,
         workers: int = 1,
         block_size: int = UNITS["MiB"],
-        wait: bool = True,
+        wait: bool = False,
         dryrun: bool = False,
         create: bool = False,
-        interval: Union[float, int] = 5,
-        pause: Union[float, int] = 0.5,
+        interval: Union[float, int] = 1,
+        pause: Union[float, int] = 0.1,
     ) -> "Syncer":
         if not self.source:
             raise AttributeError("Source is not assigned.")
@@ -163,7 +164,7 @@ class Syncer(object):
         if 0 < len(self._hash_algorithms):
             for hash_ in self._hash_algorithms:
                 data = hash_(data)
-        return data
+        return data.digest()
 
     def _run_alive_workers(self) -> "Syncer":
         for worker in self._alive_workers:
@@ -177,8 +178,8 @@ class Syncer(object):
         block_size: int,
         dryrun: bool = False,
         create: bool = False,
-        interval: Union[float, int] = 5,
-        pause: Union[float, int] = 0.5,
+        interval: Union[float, int] = 1,
+        pause: Union[float, int] = 0.1,
     ) -> None:
         try:
             try:
@@ -186,9 +187,14 @@ class Syncer(object):
                 self.destination.do_open()
             except FileNotFoundError:
                 if create:
-                    self.destination.do_create(self.source.do_open().size).do_open()
+                    if worker_id == 1:
+                        self.destination.do_create(self.source.do_open().size).do_open()
+                        self._event.set()
+                    else:
+                        self._event.wait()
+                        self.destination.do_open()
                 else:
-                    raise FileNotFoundError
+                    raise FileNotFoundError  # pragma: no cover
 
             if self.source.size != self.destination.size:
                 raise ValueError("size not same")
@@ -222,7 +228,7 @@ class Syncer(object):
                         self._logger.info(
                             "[Worker {}]: Suspending...".format(worker_id)
                         )
-                        time.sleep(pause)
+                        time.sleep(1)
 
                     if self._cancel:
                         raise CancelSync(
