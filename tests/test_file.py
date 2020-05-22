@@ -1,3 +1,4 @@
+import os
 import pathlib
 import unittest
 import paramiko
@@ -95,7 +96,7 @@ class TestCase(unittest.TestCase):
 
         self.remote_file.do_create().do_open().execute("write", write_data).execute(
             "flush"
-        ).execute("seek", 0)
+        ).execute("seek", os.SEEK_SET)
 
         self.assertEqual(b"".join(self.remote_file.get_blocks()), write_data)
 
@@ -131,10 +132,10 @@ class TestCase(unittest.TestCase):
 
     def test_raise_error_when_execute_not_opened_file(self) -> None:
         with self.assertRaises(AttributeError):
-            self.local_file.execute("seek", 0)
+            self.local_file.execute("seek", os.SEEK_SET)
 
         with self.assertRaises(AttributeError):
-            self.local_file.execute_with_result("seek", 0)
+            self.local_file.execute_with_result("seek", os.SEEK_SET)
 
     def test_invalid_ssh_cipher(self) -> None:
         with self.assertRaises(ValueError):

@@ -31,7 +31,6 @@ class File(object):
 
         self.path = path
         self.start_pos = start_pos
-        self.size: int = 0
         self.remote = remote
         self.ssh_options: Dict[str, Any] = {
             "hostname": hostname,
@@ -87,9 +86,6 @@ class File(object):
             return self
 
         self._local.io = self._open(mode="rb+")
-        self.size = self.execute("seek", os.SEEK_SET, os.SEEK_END).execute_with_result(
-            "tell"
-        )
         self.execute("seek", os.SEEK_SET)
         return self
 
@@ -148,3 +144,11 @@ class File(object):
             return True
         except:
             return False
+
+    @property
+    def size(self) -> int:
+        if self.remote:
+            _stat = self._local.sftp.stat
+        else:
+            _stat = os.stat
+        return _stat(self.path).st_size
