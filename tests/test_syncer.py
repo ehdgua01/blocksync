@@ -1,7 +1,10 @@
+import sys
 import unittest
 import unittest.mock
 import logging
 import pathlib
+import signal
+from contextlib import contextmanager
 
 from blocksync import Syncer, File
 from blocksync.utils import generate_random_data
@@ -17,6 +20,27 @@ class TestCase(unittest.TestCase):
     def tearDown(self) -> None:
         pathlib.Path(self.source.path).unlink(missing_ok=True)
         pathlib.Path(self.destination.path).unlink(missing_ok=True)
+
+    def create_source_file(self, size: int) -> None:
+        self.source.do_create(size)
+        self.source.do_open().execute(
+            "write", generate_random_data(size).encode()
+        ).execute("flush")
+        self.source.do_close()
+
+    @contextmanager
+    def timeout(self, time):
+        signal.signal(signal.SIGALRM, self.raise_timeout)
+        signal.alarm(time)
+        try:
+            yield
+        except TimeoutError:
+            pass
+        finally:
+            signal.signal(signal.SIGALRM, signal.SIG_IGN)
+
+    def raise_timeout(self, signum, frame) -> None:
+        raise TimeoutError()
 
     def test_set_source(self) -> None:
         with self.assertRaises(TypeError):
@@ -110,26 +134,22 @@ class TestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.syncer.start_sync(pause="xxx")
 
-        size = UNITS["MiB"] * 10
-        self.source.do_create(size)
-        self.destination.do_create(size)
-        self.source.do_open().execute(
-            "write", generate_random_data(size).encode()
-        ).execute("flush")
-        self.source.do_close()
-        self.destination.do_close()
-
         mock_before = unittest.mock.MagicMock()
         mock_after = unittest.mock.MagicMock()
         mock_monitor = unittest.mock.MagicMock()
-
         self.assertEqual(
             self.syncer.set_callbacks(
                 before=mock_before, after=mock_after, monitor=mock_monitor
             ),
             self.syncer,
         )
-        self.assertEqual(self.syncer.start_sync(interval=0).started, True)
+
+        size = UNITS["MiB"] * 10
+        self.create_source_file(size)
+        # set hash algorithm
+        self.syncer.set_hash_algorithms(["sha256"])
+
+        self.assertEqual(self.syncer.start_sync(workers=5, interval=0, create=True).started, True)
         self.assertEqual(self.syncer.wait(), self.syncer)
         self.assertEqual(self.syncer.finished, True)
         self.assertEqual(
@@ -138,3 +158,58 @@ class TestCase(unittest.TestCase):
         mock_before.assert_called()
         mock_after.assert_called()
         mock_monitor.assert_called()
+
+    def test_cancel_sync(self) -> None:
+        self.create_source_file(1000)
+        self.syncer._add_block = unittest.mock.MagicMock()
+        self.assertEqual(
+            self.syncer.set_source(self.source)
+            .set_destination(self.destination)
+            .cancel(),
+            self.syncer,
+        )
+        self.syncer.start_sync(wait=True, create=True)
+        self.syncer._add_block.assert_not_called()
+
+    def test_dryrun(self) -> None:
+        self.create_source_file(10)
+        self.syncer.set_source(self.source).set_destination(
+            self.destination
+        ).start_sync(dryrun=True, wait=True, create=True)
+        self.assertEqual(
+            self.syncer.blocks, {"size": 10, "same": 0, "diff": 1, "done": 1}
+        )
+        self.assertNotEqual(
+            self.source.do_open().execute_with_result("read"),
+            self.destination.do_open().execute_with_result("read"),
+        )
+
+    def test_suspend_and_resume(self) -> None:
+        self.create_source_file(10)
+        self.assertEqual(
+            self.syncer.set_source(self.source)
+            .set_destination(self.destination)
+            .suspend(),
+            self.syncer,
+        )
+        self.assertTrue(self.syncer._suspend)
+
+        self.syncer._logger.info = unittest.mock.MagicMock()
+
+        with self.timeout(3):
+            self.syncer.start_sync(wait=True, create=True)
+
+        self.syncer._logger.info.assert_called_with(
+            "[Worker {}]: Suspending...".format(1)
+        )
+        self.assertEqual(
+            self.syncer.set_source(self.source)
+            .set_destination(self.destination)
+            .resume(),
+            self.syncer,
+        )
+        self.assertFalse(self.syncer._suspend)
+        self.syncer.start_sync(wait=True, create=True)
+        self.assertEqual(
+            self.syncer.blocks, {"size": 10, "same": 0, "diff": 1, "done": 1}
+        )
