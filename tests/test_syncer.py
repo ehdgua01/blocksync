@@ -1,4 +1,3 @@
-import sys
 import unittest
 import unittest.mock
 import logging
@@ -146,18 +145,28 @@ class TestCase(unittest.TestCase):
 
         size = UNITS["MiB"] * 10
         self.create_source_file(size)
-        # set hash algorithm
-        self.syncer.set_hash_algorithms(["sha256"])
 
-        self.assertEqual(self.syncer.start_sync(workers=5, interval=0, create=True).started, True)
+        self.assertEqual(
+            self.syncer.set_hash_algorithms(["sha256"])
+            .start_sync(workers=5, block_size=UNITS["MiB"], interval=0, create=True)
+            .started,
+            True,
+        )
         self.assertEqual(self.syncer.wait(), self.syncer)
         self.assertEqual(self.syncer.finished, True)
         self.assertEqual(
             self.syncer.blocks, {"size": size, "same": 0, "diff": 10, "done": 10}
         )
-        mock_before.assert_called()
-        mock_after.assert_called()
-        mock_monitor.assert_called()
+        mock_before.assert_called_with(self.syncer.blocks)
+        mock_after.assert_called_with(self.syncer.blocks)
+        mock_monitor.assert_called_with(self.syncer.blocks)
+
+        self.assertEqual(
+            self.source.do_open().execute_with_result("read"),
+            self.destination.do_open().execute_with_result("read"),
+        )
+        self.source.do_close()
+        self.destination.do_close()
 
     def test_cancel_sync(self) -> None:
         self.create_source_file(1000)

@@ -119,6 +119,12 @@ class Syncer(object):
             self._run_alive_workers()
         return self
 
+    def reset_blocks(self) -> "Syncer":
+        self._blocks.update(
+            {"size": -1, "same": 0, "diff": 0, "done": 0}
+        )
+        return self
+
     def start_sync(
         self,
         workers: int = 1,
@@ -137,6 +143,8 @@ class Syncer(object):
         if not (isinstance(interval, (float, int)) and isinstance(pause, (float, int))):
             raise TypeError("Interval and pause requires float or int type")
 
+        self.reset_blocks()
+        self._event.clear()
         self._worker_threads = [
             threading.Thread(
                 target=self._sync,
@@ -163,8 +171,8 @@ class Syncer(object):
     def _hash(self, data: Any) -> Any:
         if 0 < len(self._hash_algorithms):
             for hash_ in self._hash_algorithms:
-                data = hash_(data)
-        return data.digest()
+                data = hash_(data).digest()
+        return data
 
     def _run_alive_workers(self) -> "Syncer":
         for worker in self._alive_workers:
@@ -188,13 +196,13 @@ class Syncer(object):
             except FileNotFoundError:
                 if create:
                     if worker_id == 1:
-                        self.destination.do_create(self.source.do_open().size).do_open()
+                        self.destination.do_create(self.source.size)
                         self._event.set()
                     else:
                         self._event.wait()
-                        self.destination.do_open()
+                    self.destination.do_close().do_open()
                 else:
-                    raise FileNotFoundError  # pragma: no cover
+                    raise FileNotFoundError
 
             if self.source.size != self.destination.size:
                 raise ValueError("size not same")
@@ -205,7 +213,7 @@ class Syncer(object):
             end_pos = chunk_size * worker_id
 
             if 1 < worker_id:
-                start_pos = (chunk_size * (worker_id - 1)) + 1
+                start_pos = chunk_size * (worker_id - 1)
                 self.source.execute("seek", start_pos, os.SEEK_SET)
                 self.destination.execute("seek", start_pos, os.SEEK_SET)
 
@@ -237,7 +245,7 @@ class Syncer(object):
                             )
                         )
 
-                    if block[0] == block[1]:
+                    if self._hash(block[0]) == self._hash(block[1]):
                         self._add_block("same")
                     else:
                         self._add_block("diff")
@@ -245,7 +253,7 @@ class Syncer(object):
                         if not dryrun:
                             self.destination.execute(
                                 "seek", -block_size, os.SEEK_CUR
-                            ).execute("write", self._hash(block[0])).execute("flush")
+                            ).execute("write", block[0]).execute("flush")
 
                     if interval <= timer() - t_last:
                         if self.monitor:
