@@ -152,6 +152,7 @@ class TestCase(unittest.TestCase):
             .started,
             True,
         )
+        self.assertFalse(self.syncer.finished)
         self.assertEqual(self.syncer.wait(), self.syncer)
         self.assertEqual(self.syncer.finished, True)
         self.assertEqual(
@@ -164,6 +165,16 @@ class TestCase(unittest.TestCase):
         self.assertEqual(
             self.source.do_open().execute_with_result("read"),
             self.destination.do_open().execute_with_result("read"),
+        )
+
+        self.assertEqual(
+            self.syncer.set_hash_algorithms(["sha256"])
+            .start_sync(workers=5, block_size=UNITS["MiB"], interval=0, wait=True)
+            .started,
+            True,
+        )
+        self.assertEqual(
+            self.syncer.blocks, {"size": size, "same": 10, "diff": 0, "done": 10}
         )
         self.source.do_close()
         self.destination.do_close()
@@ -180,6 +191,14 @@ class TestCase(unittest.TestCase):
         self.syncer.start_sync(wait=True, create=True)
         self.syncer._add_block.assert_not_called()
 
+    def test_get_rate(self) -> None:
+        self.create_source_file(10)
+        self.assertEqual(self.syncer.get_rate(), 0.00)
+        self.syncer.set_source(self.source).set_destination(
+            self.destination
+        ).start_sync(wait=True, create=True)
+        self.assertEqual(self.syncer.get_rate(), 100.00)
+
     def test_dryrun(self) -> None:
         self.create_source_file(10)
         self.syncer.set_source(self.source).set_destination(
@@ -195,30 +214,22 @@ class TestCase(unittest.TestCase):
 
     def test_suspend_and_resume(self) -> None:
         self.create_source_file(10)
-        self.assertEqual(
-            self.syncer.set_source(self.source)
-            .set_destination(self.destination)
-            .suspend(),
-            self.syncer,
-        )
-        self.assertTrue(self.syncer._suspend)
-
         self.syncer._logger.info = unittest.mock.MagicMock()
 
         with self.timeout(3):
-            self.syncer.start_sync(wait=True, create=True)
+            self.syncer.set_source(self.source).set_destination(
+                self.destination
+            ).start_sync(create=True)
+            self.assertEqual(
+                self.syncer.suspend(), self.syncer,
+            )
+            self.syncer.wait()
 
         self.syncer._logger.info.assert_called_with(
             "[Worker {}]: Suspending...".format(1)
         )
-        self.assertEqual(
-            self.syncer.set_source(self.source)
-            .set_destination(self.destination)
-            .resume(),
-            self.syncer,
-        )
-        self.assertFalse(self.syncer._suspend)
-        self.syncer.start_sync(wait=True, create=True)
+        self.assertEqual(self.syncer.resume(), self.syncer)
+        self.syncer.wait()
         self.assertEqual(
             self.syncer.blocks, {"size": 10, "same": 0, "diff": 1, "done": 1}
         )

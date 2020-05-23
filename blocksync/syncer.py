@@ -31,7 +31,7 @@ class Syncer(object):
 
         # internal attributes or properties
         self._lock = threading.Lock()
-        self._event = threading.Event()
+        self._create = threading.Event()
         self._blocks: Dict[str, int] = {
             "size": -1,
             "same": 0,
@@ -39,7 +39,7 @@ class Syncer(object):
             "done": 0,
         }
         self._worker_threads: List[threading.Thread] = []
-        self._suspend = False
+        self._suspend = threading.Event()
         self._cancel = False
         self._started = False
         self._logger = blocksync_logger
@@ -100,12 +100,12 @@ class Syncer(object):
         return self
 
     def suspend(self) -> "Syncer":
-        self._suspend = True
+        self._suspend.clear()
         self._logger.info("Suspending...")
         return self
 
     def resume(self) -> "Syncer":
-        self._suspend = False
+        self._suspend.set()
         self._logger.info("Resuming...")
         return self
 
@@ -142,7 +142,8 @@ class Syncer(object):
             raise TypeError("Interval and pause requires float or int type")
 
         self.reset_blocks()
-        self._event.clear()
+        self._create.clear()
+        self._suspend.set()
         self._worker_threads = [
             threading.Thread(
                 target=self._sync,
@@ -195,15 +196,17 @@ class Syncer(object):
                 if create:
                     if worker_id == 1:
                         self.destination.do_create(self.source.size)
-                        self._event.set()
+                        self._create.set()
                     else:
-                        self._event.wait()
+                        self._create.wait()
                     self.destination.do_close().do_open()
                 else:
-                    raise FileNotFoundError
+                    self._logger.error("Not exists destination file")
+                    return
 
             if self.source.size != self.destination.size:
-                raise ValueError("size not same")
+                self._logger.error("size not same")
+                return
             elif self._blocks["size"] == -1:
                 self._blocks["size"] = self.source.size
 
@@ -230,11 +233,11 @@ class Syncer(object):
                     self.source.get_blocks(block_size),
                     self.destination.get_blocks(block_size),
                 ):
-                    while self._suspend:
+                    if not self._suspend.is_set():
                         self._logger.info(
                             "[Worker {}]: Suspending...".format(worker_id)
                         )
-                        time.sleep(1)
+                        self._suspend.wait()
 
                     if self._cancel:
                         raise CancelSync(
@@ -276,10 +279,17 @@ class Syncer(object):
                 self._logger.info(e)
             except Exception as e:
                 if self.on_error:
-                    self.on_error(e, self._blocks)
+                    return self.on_error(e, self._blocks)
         finally:
             self.source.do_close()
             self.destination.do_close()
+
+    def get_rate(self, block_size: int = UNITS["MiB"]) -> float:
+        if self._blocks["done"] < 1:
+            return 0.00
+
+        rate = (self._blocks["done"] / (self._blocks["size"] // block_size or 1)) * 100
+        return 100.00 if 100 <= rate else rate
 
     @property
     def source(self) -> File:
@@ -292,10 +302,6 @@ class Syncer(object):
     @property
     def blocks(self) -> Dict[str, int]:
         return self._blocks
-
-    @property
-    def rate(self) -> float:
-        return (self._blocks["done"] / self._blocks["size"]) * 100
 
     @property
     def started(self) -> bool:
