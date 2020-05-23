@@ -45,17 +45,15 @@ class TestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.syncer.set_source("")
 
-        source = File("source.file")
-        self.assertEqual(self.syncer.set_source(source), self.syncer)
-        self.assertEqual(self.syncer.source, source)
+        self.assertEqual(self.syncer.set_source(self.source), self.syncer)
+        self.assertEqual(self.syncer.source, self.source)
 
     def test_set_destination(self) -> None:
         with self.assertRaises(TypeError):
             self.syncer.set_destination("")
 
-        destination = File("destination.file")
-        self.assertEqual(self.syncer.set_destination(destination), self.syncer)
-        self.assertEqual(self.syncer.destination, destination)
+        self.assertEqual(self.syncer.set_destination(self.destination), self.syncer)
+        self.assertEqual(self.syncer.destination, self.destination)
 
     def test_set_callbacks(self) -> None:
         for callback in ["before", "after", "monitor", "on_error"]:
