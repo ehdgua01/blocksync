@@ -40,9 +40,10 @@ Installation
 
 Examples
 --------
-Please refer to `examples`_ at the beginning.
+Please refer to `examples`_ and `tests`_ at the beginning.
 
 .. _examples: https://github.com/ehdgua01/blocksync/tree/master/examples
+.. _tests: https://github.com/ehdgua01/blocksync/tree/master/tests
 
 License
 -------
