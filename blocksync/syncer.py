@@ -304,6 +304,10 @@ class Syncer(object):
         return self._blocks
 
     @property
+    def hash_algorithms(self) -> List[Callable]:
+        return self._hash_algorithms
+
+    @property
     def started(self) -> bool:
         return self._started
 

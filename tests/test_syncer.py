@@ -1,3 +1,4 @@
+import hashlib
 import unittest
 import unittest.mock
 import logging
@@ -99,8 +100,18 @@ class TestCase(unittest.TestCase):
         # Does not raise errors even when
         # the type of hash algorithms is not a string array
         self.assertEqual(self.syncer.set_hash_algorithms(""), self.syncer)
-
-        self.assertEqual(self.syncer.set_hash_algorithms(["sha256"]), self.syncer)
+        algorithms = ["sha256", "md5", "blake2b"]
+        self.assertEqual(self.syncer.set_hash_algorithms(algorithms), self.syncer)
+        self.assertEqual(
+            self.syncer.hash_algorithms, [getattr(hashlib, algo) for algo in algorithms]
+        )
+        self.create_source_file(10)
+        self.syncer.set_source(self.source).set_destination(
+            self.destination
+        ).start_sync(create=True, wait=True)
+        self.assertEqual(
+            self.syncer.blocks, {"size": 10, "same": 0, "diff": 1, "done": 1}
+        )
 
     def test_set_logger(self) -> None:
         for logger in ["xxx", object]:
