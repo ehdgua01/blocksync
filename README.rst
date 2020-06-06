@@ -1,7 +1,7 @@
 blocksync
 =========
 
-Blocksync Python package allows `blocksync script`_ to be used as Python packages, and supports more convenient and diverse functions than blocksync script.
+Blocksync Python package allows `blocksync script`_ to be used as Python packages, and supports more convenient and various functions than blocksync script.
 
 .. _blocksync script: http://https://github.com/theraser/blocksync
 
