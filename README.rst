@@ -31,9 +31,6 @@ Features
 Prerequisites
 -------------
 * Python 3.8 or later
-* `paramiko`_
-
-.. _paramiko: http://www.paramiko.org/
 
 Installation
 ------------
