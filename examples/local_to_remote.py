@@ -13,5 +13,7 @@ destination_file = blocksync.File(
     key_filename="",
     cipher="aes128-ctr",
 )
-syncer = blocksync.Syncer(source_file, destination_file)
+syncer = blocksync.Syncer()
+syncer.set_source(source_file)
+syncer.set_destination(destination_file)
 syncer.start_sync()
