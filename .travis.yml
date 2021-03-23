@@ -2,16 +2,18 @@ language: python
 
 python: "3.8"
 
-cache: pip
+cache:
+  directories:
+    - $HOME/.cache/pip
+    - $HOME/.cache/pre-commit
 
 install:
   - .travis/install.sh
 
 before_script:
-  - black --check .
+  - pre-commit run --all-files
 
 script:
-  - flake8 .
   - pytest
 
 after_script:
