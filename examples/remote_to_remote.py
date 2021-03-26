@@ -1,6 +1,5 @@
 import blocksync
 
-
 source_file = blocksync.File(
     "source.file",
     remote=True,
@@ -8,10 +7,8 @@ source_file = blocksync.File(
     username="example_user",
     password="example_password",
     compress=False,
-    port=9922,
-    key_filename="",
-    cipher="blowfish-cbc",
 )
+source_file.do_create(10_000)
 destination_file = blocksync.File(
     "destination.file",
     remote=True,
@@ -19,11 +16,6 @@ destination_file = blocksync.File(
     username="example_user",
     password="example_password",
     compress=True,
-    port=22,
-    key_filename="",
-    cipher="aes128-ctr",
 )
-syncer = blocksync.Syncer()
-syncer.set_source(source_file)
-syncer.set_destination(destination_file)
-syncer.start_sync()
+syncer = blocksync.Syncer(source_file, destination_file)
+syncer.start_sync(create=True)

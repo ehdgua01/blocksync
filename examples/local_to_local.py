@@ -1,9 +1,8 @@
 import blocksync
 
-
+size = 10_000
 source_file = blocksync.File("source.file")
+source_file.do_create(size)
 destination_file = blocksync.File("destination.file")
-syncer = blocksync.Syncer()
-syncer.set_source(source_file)
-syncer.set_destination(destination_file)
-syncer.start_sync()
+syncer = blocksync.Syncer(source_file, destination_file)
+syncer.start_sync(create=True)
