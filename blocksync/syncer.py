@@ -207,7 +207,7 @@ class Syncer(object):
             t_last = timer()
 
             try:
-                for block in zip(
+                for source_block, dest_block in zip(
                     self.source.get_blocks(block_size),
                     self.destination.get_blocks(block_size),
                 ):
@@ -218,14 +218,15 @@ class Syncer(object):
                     if self._cancel:
                         raise CancelSync("[Worker {}]: synchronization task has been canceled".format(worker_id))
 
-                    if self._hash(block[0]) == self._hash(block[1]):
+                    if self._hash(source_block) == self._hash(dest_block):
                         self._add_block("same")
                     else:
                         self._add_block("diff")
 
                         if not dryrun:
-                            self.destination.execute("seek", -block_size, os.SEEK_CUR).execute(
-                                "write", block[0]
+                            offset = min(len(source_block), block_size)
+                            self.destination.execute("seek", offset=-offset, whence=os.SEEK_CUR).execute(
+                                "write", data=source_block
                             ).execute("flush")
 
                     if interval <= timer() - t_last:
