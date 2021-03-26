@@ -1,16 +1,17 @@
 import os
 import threading
 from pathlib import PurePath
-from typing import Any, Union, Dict, IO
+from typing import IO, Any, Dict, List, Optional, Union
 
 import paramiko
+from paramiko import Transport
 
 from blocksync.consts import SSH_PORT, UNITS
 
 __all__ = ["File"]
 
 
-class File(object):
+class File:
     def __init__(
         self,
         path: Union[PurePath, str],
@@ -22,13 +23,8 @@ class File(object):
         password: str = None,
         key_filename: Union[PurePath, str] = None,
         compress: bool = True,
-        cipher: str = "aes128-ctr",
-    ) -> None:
-        __paramiko_ciphers = paramiko.Transport._preferred_ciphers
-
-        if remote and (cipher not in __paramiko_ciphers):
-            raise ValueError("Invalid ssh encryption algorithm")
-
+        disabled_ciphers: Optional[List[str]] = None,
+    ):
         self.path = path
         self.start_pos = start_pos
         self.remote = remote
@@ -39,39 +35,33 @@ class File(object):
             "password": password,
             "key_filename": key_filename,
             "compress": compress,
-            "disabled_algorithms": {
-                "cipher": [c for c in __paramiko_ciphers if cipher != c]
-            },
+            "disabled_algorithms": {"cipher": disabled_ciphers},
         }
-
         self._local = threading.local()
 
     def __repr__(self):
-        return "<blocksync.File path={} state={}>".format(
-            self.path, "opened" if self.opened else "closed",
-        )
+        return f"<blocksync.File() path={self.path} state={'opened' if self.opened else 'closed'}>"
 
     def open_sftp(self, session: paramiko.SSHClient = None) -> "File":
-        if self.connected:
+        if self.ssh_connected:
             return self
-
-        if session is None:
+        if session:
+            if not isinstance(session, paramiko.SSHClient):
+                raise ValueError("Session isn't instance of paramiko.SSHClient")
+            transport: Optional[Transport] = session.get_transport()
+            if not (transport and transport.is_active()):
+                raise ValueError("This session is not connected")
+            self._local.ssh = session
+        else:
             self._local.ssh = paramiko.SSHClient()
             self._local.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy)
             self._local.ssh.load_system_host_keys()
             self._local.ssh.connect(**self.ssh_options)
-        elif not isinstance(session, paramiko.SSHClient):
-            raise ValueError("Session isn't instance of paramiko.SSHClient")
-        elif session.get_transport() is None or not session.get_transport().is_active():
-            raise ValueError("This session is not connected")
-        else:
-            self._local.ssh = session
-
         self._local.sftp = self._local.ssh.open_sftp()
         return self
 
     def close_sftp(self) -> "File":
-        if self.connected:
+        if self.ssh_connected:
             self._local.sftp.close()
             self._local.ssh.close()
         return self
@@ -84,7 +74,6 @@ class File(object):
     def do_open(self) -> "File":
         if self.opened:
             return self
-
         self._local.io = self._open(mode="rb+")
         self.execute("seek", os.SEEK_SET)
         return self
@@ -94,9 +83,8 @@ class File(object):
             if flush:
                 self._local.io.flush()
             self._local.io.close()
-
-        if self.remote and self.connected and close_sftp:
-            self.close_sftp()
+            if self.remote and self.ssh_connected and close_sftp:
+                self.close_sftp()
         return self
 
     def get_blocks(self, block_size: int = UNITS["MiB"]) -> Any:
@@ -121,29 +109,29 @@ class File(object):
 
     def _open(self, mode: str) -> IO:
         if self.remote:
-            if not self.connected:
+            if not self.ssh_connected:
                 self.open_sftp()
             return self._local.sftp.open(self.path, mode=mode)
         else:
             return open(self.path, mode=mode)
 
     @property
-    def connected(self) -> bool:
-        if (
-            hasattr(self._local, "ssh")
-            and isinstance(self._local.ssh, paramiko.SSHClient)
-            and self._local.ssh.get_transport() is not None
-        ):
-            return self._local.ssh.get_transport().is_active()
-        return False
+    def ssh_connected(self) -> bool:
+        try:
+            transport = self._local.ssh.get_transport()
+            transport.send_ignore()
+            return True
+        except (AttributeError, EOFError):
+            # connection is closed
+            return False
+
+    @property
+    def sftp_connected(self) -> bool:
+        return hasattr(self._local, "sftp")
 
     @property
     def opened(self) -> bool:
-        if hasattr(self._local, "io"):
-            if hasattr(self._local.io, "_closed"):
-                return not self._local.io._closed
-            return not self._local.io.closed
-        return False
+        return hasattr(self._local, "io") and not self._local.io.closed
 
     @property
     def size(self) -> int:

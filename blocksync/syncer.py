@@ -1,16 +1,15 @@
-import os
-import logging
 import hashlib
-import time
+import logging
+import os
 import threading
-import inspect
+import time
 from timeit import default_timer as timer
-from typing import List, Dict, Callable, Any, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
-from blocksync.file import File
-from blocksync.utils import validate_callback
-from blocksync.interrupt import CancelSync
 from blocksync.consts import UNITS
+from blocksync.file import File
+from blocksync.interrupt import CancelSync
+from blocksync.utils import validate_callback
 
 __all__ = ["Syncer"]
 
@@ -18,20 +17,21 @@ blocksync_logger = logging.getLogger(__name__)
 
 
 class Syncer(object):
-    def __init__(self) -> None:
-        self._source = None
-        self._destination = None
+    def __init__(self, source: File, destination: File) -> None:
+        self._source = source
+        self._destination = destination
         self._hash_algorithms: List[Callable] = []
 
         # callbacks
-        self._before = None
-        self._after = None
-        self._monitor = None
-        self._on_error = None
+        self._before: Optional[Callable] = None
+        self._after: Optional[Callable] = None
+        self._monitor: Optional[Callable] = None
+        self._on_error: Optional[Callable] = None
 
         # internal attributes or properties
         self._lock = threading.Lock()
         self._create = threading.Event()
+        self._suspend = threading.Event()
         self._blocks: Dict[str, int] = {
             "size": -1,
             "same": 0,
@@ -39,25 +39,18 @@ class Syncer(object):
             "done": 0,
         }
         self._worker_threads: List[threading.Thread] = []
-        self._suspend = threading.Event()
         self._cancel = False
         self._started = False
         self._logger = blocksync_logger
 
     def __repr__(self):
-        return "<blocksync.Syncer source={} destination={}>".format(
-            self.source, self.destination
-        )
+        return "<blocksync.Syncer source={} destination={}>".format(self.source, self.destination)
 
     def set_source(self, source: File) -> "Syncer":
-        if not isinstance(source, File):
-            raise TypeError("Source isn't instance of blocksync.File")
         self._source = source
         return self
 
     def set_destination(self, destination: File) -> "Syncer":
-        if not isinstance(destination, File):
-            raise TypeError("Destination isn't instance of blocksync.File")
         self._destination = destination
         return self
 
@@ -82,20 +75,14 @@ class Syncer(object):
         return self
 
     def set_hash_algorithms(self, hash_algorithms: List[str]) -> "Syncer":
-        if isinstance(hash_algorithms, list) and 0 < len(hash_algorithms):
-            if set(hash_algorithms).difference(hashlib.algorithms_available):
-                raise ValueError("Included hash algorithms that are not available")
-
-            self._hash_algorithms = [getattr(hashlib, algo) for algo in hash_algorithms]
+        if set(hash_algorithms).difference(hashlib.algorithms_available):
+            raise ValueError("Included hash algorithms that are not available")
+        self._hash_algorithms = [getattr(hashlib, algo) for algo in hash_algorithms]
         return self
 
     def set_logger(self, logger: logging.Logger) -> "Syncer":
-        if inspect.isclass(logger) and logger == logging.Logger:
-            logger = logger(__name__)
-
         if not isinstance(logger, logging.Logger):
             raise TypeError("Logger isn't instance of logging.Logger")
-
         self._logger = logger
         return self
 
@@ -133,14 +120,6 @@ class Syncer(object):
         interval: Union[float, int] = 1,
         pause: Union[float, int] = 0.1,
     ) -> "Syncer":
-        if not self.source:
-            raise AttributeError("Source is not assigned.")
-        elif not self.destination:
-            raise AttributeError("Destination is not assigned.")
-
-        if not (isinstance(interval, (float, int)) and isinstance(pause, (float, int))):
-            raise TypeError("Interval and pause requires float or int type")
-
         self.reset_blocks()
         self._create.clear()
         self._suspend.set()
@@ -189,8 +168,8 @@ class Syncer(object):
         pause: Union[float, int] = 0.1,
     ) -> None:
         try:
+            self.source.do_open()
             try:
-                self.source.do_open()
                 self.destination.do_open()
             except FileNotFoundError:
                 if create:
@@ -201,8 +180,7 @@ class Syncer(object):
                         self._create.wait()
                     self.destination.do_close().do_open()
                 else:
-                    self._logger.error("Not exists destination file")
-                    return
+                    raise
 
             if self.source.size != self.destination.size:
                 self._logger.error("size not same")
@@ -234,17 +212,11 @@ class Syncer(object):
                     self.destination.get_blocks(block_size),
                 ):
                     if not self._suspend.is_set():
-                        self._logger.info(
-                            "[Worker {}]: Suspending...".format(worker_id)
-                        )
+                        self._logger.info("[Worker {}]: Suspending...".format(worker_id))
                         self._suspend.wait()
 
                     if self._cancel:
-                        raise CancelSync(
-                            "[Worker {}]: synchronization task has been canceled".format(
-                                worker_id
-                            )
-                        )
+                        raise CancelSync("[Worker {}]: synchronization task has been canceled".format(worker_id))
 
                     if self._hash(block[0]) == self._hash(block[1]):
                         self._add_block("same")
@@ -252,9 +224,9 @@ class Syncer(object):
                         self._add_block("diff")
 
                         if not dryrun:
-                            self.destination.execute(
-                                "seek", -block_size, os.SEEK_CUR
-                            ).execute("write", block[0]).execute("flush")
+                            self.destination.execute("seek", -block_size, os.SEEK_CUR).execute(
+                                "write", block[0]
+                            ).execute("flush")
 
                     if interval <= timer() - t_last:
                         if self.monitor:
@@ -263,11 +235,7 @@ class Syncer(object):
                         t_last = timer()
 
                     if end_pos <= self.source.execute_with_result("tell"):
-                        self._logger.info(
-                            "[Worker {}]: synchronization task has been done".format(
-                                worker_id
-                            )
-                        )
+                        self._logger.info("[Worker {}]: synchronization task has been done".format(worker_id))
                         break
 
                     if 0 < pause:

@@ -1,6 +1,7 @@
 import os
 import pathlib
 import unittest
+
 import paramiko
 
 from blocksync import File
@@ -15,32 +16,30 @@ class TestCase(unittest.TestCase):
 
     def setUp(self) -> None:
         self.local_file = File(self._local_path)
-        self.remote_file = File(
-            self._remote_path, remote=True, hostname=self._server_addr
-        )
+        self.remote_file = File(self._remote_path, remote=True, hostname=self._server_addr)
 
     def tearDown(self) -> None:
         pathlib.Path(self._local_path).unlink(missing_ok=True)
 
-        if self.remote_file.connected:
+        if self.remote_file.ssh_connected:
             try:
                 self.remote_file._local.sftp.remove(self._remote_path)
                 self.remote_file.do_close(close_sftp=True)
-            except:
+            except (OSError, IOError):
                 pass
 
     def test_open_sftp_and_close_sftp(self) -> None:
-        self.assertFalse(self.remote_file.connected)
+        self.assertFalse(self.remote_file.ssh_connected)
         self.assertFalse(hasattr(self.remote_file._local, "ssh"))
 
         self.assertEqual(self.remote_file.open_sftp(), self.remote_file)
 
         self.assertTrue(isinstance(self.remote_file._local.ssh, paramiko.SSHClient))
-        self.assertTrue(self.remote_file.connected)
+        self.assertTrue(self.remote_file.ssh_connected)
 
         # do close and close sftp
         self.assertEqual(self.remote_file.close_sftp(), self.remote_file)
-        self.assertFalse(self.remote_file.connected)
+        self.assertFalse(self.remote_file.ssh_connected)
 
     def test_create_a_1MiB_local_file(self) -> None:
         self.assertEqual(self.local_file.do_create(UNITS["MiB"]), self.local_file)
@@ -51,8 +50,7 @@ class TestCase(unittest.TestCase):
 
     def test_create_a_1MiB_remote_file(self) -> None:
         self.assertEqual(self.remote_file.do_create(UNITS["MiB"]), self.remote_file)
-
-        if self.remote_file.connected:
+        if self.remote_file.ssh_connected:
             self.assertEqual(
                 self.remote_file._local.sftp.stat(self._remote_path).st_size,
                 UNITS["MiB"],
@@ -60,7 +58,6 @@ class TestCase(unittest.TestCase):
 
     def test_open_and_close_local_file(self) -> None:
         self.local_file.do_create()
-
         # open
         self.assertFalse(self.local_file.opened)
         self.assertEqual(self.local_file.do_open(), self.local_file)
@@ -69,11 +66,10 @@ class TestCase(unittest.TestCase):
         # close
         self.assertEqual(self.local_file.do_close(), self.local_file)
         self.assertFalse(self.local_file.opened)
-        self.assertFalse(self.local_file.connected)
+        self.assertFalse(self.local_file.ssh_connected)
 
     def test_open_and_close_remote_file(self) -> None:
         self.remote_file.do_create()
-
         # open
         self.assertFalse(self.remote_file.opened)
         self.assertEqual(self.remote_file.do_open(), self.remote_file)
@@ -82,21 +78,20 @@ class TestCase(unittest.TestCase):
         # close file and sftp connection
         self.assertEqual(self.remote_file.do_close(), self.remote_file)
         self.assertFalse(self.remote_file.opened)
-        self.assertFalse(self.remote_file.connected)
-
+        self.assertFalse(self.remote_file.ssh_connected)
         self.remote_file.do_open()
 
         # close only file
         self.assertEqual(self.remote_file.do_close(close_sftp=False), self.remote_file)
         self.assertFalse(self.remote_file.opened)
-        self.assertTrue(self.remote_file.connected)
+        self.assertTrue(self.remote_file.ssh_connected)
 
     def test_write_and_get_1MiB_blocks(self) -> None:
         write_data = generate_random_data(UNITS["MiB"]).encode()
 
-        self.remote_file.do_create().do_open().execute("write", write_data).execute(
-            "flush"
-        ).execute("seek", os.SEEK_SET)
+        self.remote_file.do_create().do_open().execute("write", write_data).execute("flush").execute(
+            "seek", os.SEEK_SET
+        )
 
         self.assertEqual(b"".join(self.remote_file.get_blocks()), write_data)
 
@@ -120,10 +115,6 @@ class TestCase(unittest.TestCase):
             # Only connected sessions are possible
             self.remote_file.open_sftp(session=__ssh)
 
-        with self.assertRaises(ValueError):
-            # session must be an instance of paramiko.SSHClient
-            self.remote_file.open_sftp(session={})
-
         __ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy)
         __ssh.load_system_host_keys()
         __ssh.connect(self._server_addr)
@@ -136,7 +127,3 @@ class TestCase(unittest.TestCase):
 
         with self.assertRaises(AttributeError):
             self.local_file.execute_with_result("seek", os.SEEK_SET)
-
-    def test_invalid_ssh_cipher(self) -> None:
-        with self.assertRaises(ValueError):
-            File("test_file", remote=True, cipher="invalid_cipher")
