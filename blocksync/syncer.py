@@ -225,8 +225,8 @@ class Syncer(object):
 
                         if not dryrun:
                             offset = min(len(source_block), block_size)
-                            self.destination.execute("seek", offset=-offset, whence=os.SEEK_CUR).execute(
-                                "write", data=source_block
+                            self.destination.execute("seek", -offset, os.SEEK_CUR).execute(
+                                "write", source_block
                             ).execute("flush")
 
                     if interval <= timer() - t_last:

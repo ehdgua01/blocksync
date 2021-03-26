@@ -103,15 +103,14 @@ class TestCase(unittest.TestCase):
         size = UNITS["MiB"] * 10
         self.create_source_file(size)
 
-        self.assertEqual(
+        self.assertTrue(
             self.syncer.set_hash_algorithms(["sha256"])
             .start_sync(workers=5, block_size=UNITS["MiB"], interval=0, create=True)
             .started,
-            True,
         )
         self.assertFalse(self.syncer.finished)
         self.assertEqual(self.syncer.wait(), self.syncer)
-        self.assertEqual(self.syncer.finished, True)
+        self.assertTrue(self.syncer.finished)
         self.assertEqual(self.syncer.blocks, {"size": size, "same": 0, "diff": 10, "done": 10})
         mock_before.assert_called_with(self.syncer.blocks)
         mock_after.assert_called_with(self.syncer.blocks)
@@ -122,11 +121,10 @@ class TestCase(unittest.TestCase):
             self.destination.do_open().execute_with_result("read"),
         )
 
-        self.assertEqual(
+        self.assertTrue(
             self.syncer.set_hash_algorithms(["sha256"])
             .start_sync(workers=5, block_size=UNITS["MiB"], interval=0, wait=True)
             .started,
-            True,
         )
         self.assertEqual(self.syncer.blocks, {"size": size, "same": 10, "diff": 0, "done": 10})
         self.source.do_close()
