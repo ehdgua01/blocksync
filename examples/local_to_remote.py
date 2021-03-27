@@ -1,7 +1,6 @@
 import blocksync
 
-source_file = blocksync.File("source.file")
-source_file.do_create(10_000)
+source_file = blocksync.File("source.file").do_create(10_000)
 destination_file = blocksync.File(
     "destination.file",
     remote=True,

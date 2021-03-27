@@ -8,7 +8,6 @@ source_file = blocksync.File(
     password="example_password",
     compress=False,
 )
-source_file.do_create(10_000)
 destination_file = blocksync.File(
     "destination.file",
     remote=True,
@@ -18,4 +17,4 @@ destination_file = blocksync.File(
     compress=True,
 )
 syncer = blocksync.Syncer(source_file, destination_file)
-syncer.start_sync(create=True)
+syncer.start_sync(wait=True, create=True)
