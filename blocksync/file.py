@@ -40,7 +40,7 @@ class File:
         self._local = threading.local()
 
     def __repr__(self):
-        return f"<blocksync.File() path={self.path} state={'opened' if self.opened else 'closed'}>"
+        return f"<blocksync.File() remote={self.remote} path={self.path} state={'opened' if self.opened else 'closed'}>"
 
     def open_sftp(self, session: paramiko.SSHClient = None) -> "File":
         if self.ssh_connected:

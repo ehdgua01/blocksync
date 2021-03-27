@@ -193,22 +193,19 @@ class Syncer(object):
 
             chunk_size = self.source.size // workers
             end_pos = chunk_size * worker_id
-
             if 1 < worker_id:
                 start_pos = chunk_size * (worker_id - 1)
                 self.source.execute("seek", start_pos, os.SEEK_SET)
                 self.destination.execute("seek", start_pos, os.SEEK_SET)
-
                 if worker_id == workers:
                     end_pos += self.source.size % workers
 
-            self._logger.info("Start sync {}".format(self.destination))
+            self._logger.info(f"Start sync {self.source} to {self.destination}")
 
             if self.before:
                 self.before(self._blocks)
 
             t_last = timer()
-
             try:
                 for source_block, dest_block in zip(
                     self.source.get_blocks(block_size),
@@ -217,39 +214,32 @@ class Syncer(object):
                     if not self._suspend.is_set():
                         self._logger.info("[Worker {}]: Suspending...".format(worker_id))
                         self._suspend.wait()
-
                     if self._cancel:
                         raise CancelSync("[Worker {}]: synchronization task has been canceled".format(worker_id))
-
                     if self._hash(source_block) == self._hash(dest_block):
                         self._add_block("same")
                     else:
                         self._add_block("diff")
-
                         if not dryrun:
                             offset = min(len(source_block), block_size)
                             self.destination.execute("seek", -offset, os.SEEK_CUR).execute(
                                 "write", source_block
                             ).execute("flush")
-
                     if interval <= timer() - t_last:
                         if self.monitor:
                             self.monitor(self._blocks)
-
                         t_last = timer()
-
                     if end_pos <= self.source.execute_with_result("tell"):
                         self._logger.info("[Worker {}]: synchronization task has been done".format(worker_id))
                         break
-
                     if 0 < pause:
                         time.sleep(pause)
-
                 if self.after:
                     self.after(self._blocks)
             except CancelSync as e:
                 self._logger.info(e)
             except Exception as e:
+                self._logger.error(e, exc_info=True)
                 if self.on_error:
                     return self.on_error(e, self._blocks)
         finally:
