@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import logging.handlers
 import os
 import threading
 import time
@@ -14,6 +15,8 @@ from blocksync.utils import validate_callback
 __all__ = ["Syncer"]
 
 blocksync_logger = logging.getLogger(__name__)
+blocksync_logger.setLevel(logging.INFO)
+blocksync_logger.addHandler(logging.StreamHandler())
 
 
 class Syncer(object):
