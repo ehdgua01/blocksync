@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import stat
 import threading
 from pathlib import PurePath
 from typing import IO, Any, Dict, List, Optional, Union
@@ -48,8 +49,6 @@ class File:
         if self.ssh_connected:
             return self
         if session:
-            if not isinstance(session, paramiko.SSHClient):
-                raise ValueError("Session isn't instance of paramiko.SSHClient")
             transport: Optional[Transport] = session.get_transport()
             if not (transport and transport.is_active()):
                 raise ValueError("This session is not connected")
@@ -144,3 +143,7 @@ class File:
     @property
     def size(self) -> int:
         return self.stat.st_size  # type: ignore
+
+    @property
+    def is_block_device(self) -> bool:
+        return stat.S_ISBLK(self.stat.st_mode)  # type: ignore
