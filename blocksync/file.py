@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import threading
 from pathlib import PurePath
@@ -42,7 +44,7 @@ class File:
     def __repr__(self):
         return f"<blocksync.File() remote={self.remote} path={self.path} state={'opened' if self.opened else 'closed'}>"
 
-    def open_sftp(self, session: paramiko.SSHClient = None) -> "File":
+    def open_sftp(self, session: paramiko.SSHClient = None) -> File:
         if self.ssh_connected:
             return self
         if session:
@@ -60,25 +62,25 @@ class File:
         self._local.sftp = self._local.ssh.open_sftp()
         return self
 
-    def close_sftp(self) -> "File":
+    def close_sftp(self) -> File:
         if self.ssh_connected:
             self._local.sftp.close()
             self._local.ssh.close()
         return self
 
-    def do_create(self, size: int = 0) -> "File":
+    def do_create(self, size: int = 0) -> File:
         with self._open(mode="w") as f:
             f.truncate(size or self.size)
         return self
 
-    def do_open(self) -> "File":
+    def do_open(self) -> File:
         if self.opened:
             return self
         self._local.io = self._open(mode="rb+")
         self.execute("seek", os.SEEK_SET)
         return self
 
-    def do_close(self, flush=True, close_sftp=True) -> "File":
+    def do_close(self, flush=True, close_sftp=True) -> File:
         if self.opened:
             if flush:
                 self._local.io.flush()
@@ -94,7 +96,7 @@ class File:
             else:
                 break  # pragma: no cover
 
-    def execute(self, operation, *args, **kwargs) -> "File":
+    def execute(self, operation, *args, **kwargs) -> File:
         self._execute(operation, *args, **kwargs)
         return self
 
@@ -104,7 +106,6 @@ class File:
     def _execute(self, operation, *args, **kwargs) -> Any:
         if not self.opened:
             raise AttributeError("File is not opened")
-
         return getattr(self._local.io, operation)(*args, **kwargs)
 
     def _open(self, mode: str) -> IO:
@@ -131,12 +132,15 @@ class File:
 
     @property
     def opened(self) -> bool:
-        return hasattr(self._local, "io") and not self._local.io.closed
+        try:
+            return not self._local.io.closed
+        except AttributeError:
+            return False
+
+    @property
+    def stat(self) -> Union[os.stat_result, paramiko.SFTPAttributes]:
+        return self._local.sftp.stat(self.path) if self.remote else os.stat(self.path)
 
     @property
     def size(self) -> int:
-        if self.remote:
-            _stat = self._local.sftp.stat
-        else:
-            _stat = os.stat
-        return _stat(self.path).st_size
+        return self.stat.st_size  # type: ignore

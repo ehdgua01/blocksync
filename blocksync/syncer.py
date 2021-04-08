@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import logging
 import logging.handlers
@@ -49,11 +51,11 @@ class Syncer(object):
     def __repr__(self):
         return "<blocksync.Syncer source={} destination={}>".format(self.source, self.destination)
 
-    def set_source(self, source: File) -> "Syncer":
+    def set_source(self, source: File) -> Syncer:
         self._source = source
         return self
 
-    def set_destination(self, destination: File) -> "Syncer":
+    def set_destination(self, destination: File) -> Syncer:
         self._destination = destination
         return self
 
@@ -63,7 +65,7 @@ class Syncer(object):
         after: Callable = None,
         monitor: Callable = None,
         on_error: Callable = None,
-    ) -> "Syncer":
+    ) -> Syncer:
         if before and validate_callback(before, 1):
             self._before = before
 
@@ -77,39 +79,39 @@ class Syncer(object):
             self._on_error = on_error
         return self
 
-    def set_hash_algorithms(self, hash_algorithms: List[str]) -> "Syncer":
+    def set_hash_algorithms(self, hash_algorithms: List[str]) -> Syncer:
         if set(hash_algorithms).difference(hashlib.algorithms_available):
             raise ValueError("Included hash algorithms that are not available")
         self._hash_algorithms = [getattr(hashlib, algo) for algo in hash_algorithms]
         return self
 
-    def set_logger(self, logger: logging.Logger) -> "Syncer":
+    def set_logger(self, logger: logging.Logger) -> Syncer:
         if not isinstance(logger, logging.Logger):
             raise TypeError("Logger isn't instance of logging.Logger")
         self._logger = logger
         return self
 
-    def suspend(self) -> "Syncer":
+    def suspend(self) -> Syncer:
         self._suspend.clear()
         self._logger.info("Suspending...")
         return self
 
-    def resume(self) -> "Syncer":
+    def resume(self) -> Syncer:
         self._suspend.set()
         self._logger.info("Resuming...")
         return self
 
-    def cancel(self) -> "Syncer":
+    def cancel(self) -> Syncer:
         self._cancel = True
         self._logger.info("Canceling...")
         return self
 
-    def wait(self) -> "Syncer":
+    def wait(self) -> Syncer:
         if self._started and 0 < len(self._worker_threads):
             self._run_alive_workers()
         return self
 
-    def reset_blocks(self) -> "Syncer":
+    def reset_blocks(self) -> Syncer:
         self._blocks.update({"size": -1, "same": 0, "diff": 0, "done": 0})
         return self
 
@@ -122,10 +124,11 @@ class Syncer(object):
         create: bool = False,
         interval: Union[float, int] = 1,
         pause: Union[float, int] = 0.1,
-    ) -> "Syncer":
+    ) -> Syncer:
         self.reset_blocks()
         self._create.clear()
         self._suspend.set()
+
         self._worker_threads = [
             threading.Thread(
                 target=self._sync,
@@ -155,7 +158,7 @@ class Syncer(object):
                 data = hash_(data).digest()
         return data
 
-    def _run_alive_workers(self) -> "Syncer":
+    def _run_alive_workers(self) -> Syncer:
         for worker in self._alive_workers:
             worker.join()
         return self
@@ -186,8 +189,7 @@ class Syncer(object):
                     raise
 
             if self.source.size != self.destination.size:
-                self._logger.error("size not same")
-                return
+                raise ValueError(f"[Worker {worker_id}]: Size not same")
             elif self._blocks["size"] == -1:
                 self._blocks["size"] = self.source.size
 
@@ -200,7 +202,7 @@ class Syncer(object):
                 if worker_id == workers:
                     end_pos += self.source.size % workers
 
-            self._logger.info(f"Start sync {self.source} to {self.destination}")
+            self._log(worker_id, f"Start sync {self.source} to {self.destination}")
 
             if self.before:
                 self.before(self._blocks)
@@ -212,10 +214,10 @@ class Syncer(object):
                     self.destination.get_blocks(block_size),
                 ):
                     if not self._suspend.is_set():
-                        self._logger.info("[Worker {}]: Suspending...".format(worker_id))
+                        self._log(worker_id, "Suspending...")
                         self._suspend.wait()
                     if self._cancel:
-                        raise CancelSync("[Worker {}]: synchronization task has been canceled".format(worker_id))
+                        raise CancelSync("Synchronization task has been canceled")
                     if self._hash(source_block) == self._hash(dest_block):
                         self._add_block("same")
                     else:
@@ -230,15 +232,16 @@ class Syncer(object):
                             self.monitor(self._blocks)
                         t_last = timer()
                     if end_pos <= self.source.execute_with_result("tell"):
-                        self._logger.info("[Worker {}]: synchronization task has been done".format(worker_id))
+                        self._log(worker_id, "!!! Done !!!")
                         break
                     if 0 < pause:
                         time.sleep(pause)
                 if self.after:
                     self.after(self._blocks)
             except CancelSync as e:
-                self._logger.info(e)
+                self._log(worker_id, str(e))
             except Exception as e:
+                self._log(worker_id, str(e), level=logging.ERROR, exc_info=True)
                 self._logger.error(e, exc_info=True)
                 if self.on_error:
                     return self.on_error(e, self._blocks)
@@ -249,9 +252,11 @@ class Syncer(object):
     def get_rate(self, block_size: int = UNITS["MiB"]) -> float:
         if self._blocks["done"] < 1:
             return 0.00
-
         rate = (self._blocks["done"] / (self._blocks["size"] // block_size or 1)) * 100
         return 100.00 if 100 <= rate else rate
+
+    def _log(self, worker_id: int, message: str, level: int = logging.INFO, **kwargs):
+        self._logger.log(level=level, msg=f"[Worker {worker_id}]: {message}", **kwargs)
 
     @property
     def source(self) -> File:
@@ -275,9 +280,7 @@ class Syncer(object):
 
     @property
     def finished(self) -> bool:
-        if self._started and len(self._alive_workers) < 1:
-            return True
-        return False
+        return self._started and len(self._alive_workers) < 1
 
     @property
     def before(self) -> Union[Callable, None]:
