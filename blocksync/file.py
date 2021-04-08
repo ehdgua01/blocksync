@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import stat
 import threading
+from functools import cached_property
 from pathlib import PurePath
 from typing import IO, Any, Dict, List, Optional, Union
 
@@ -102,6 +103,11 @@ class File:
     def execute_with_result(self, operation, *args, **kwargs) -> Any:
         return self._execute(operation, *args, **kwargs)
 
+    def _invalidate_cached_properties(self):
+        for key, value in File.__dict__.items():
+            if isinstance(value, cached_property):
+                self.__dict__.pop(key, None)
+
     def _execute(self, operation, *args, **kwargs) -> Any:
         if not self.opened:
             raise AttributeError("File is not opened")
@@ -126,6 +132,15 @@ class File:
             return False
 
     @property
+    def remote(self) -> bool:
+        return self._remote
+
+    @remote.setter
+    def remote(self, remote: bool):
+        self._invalidate_cached_properties()
+        self._remote = remote
+
+    @property
     def sftp_connected(self) -> bool:
         return hasattr(self._local, "sftp")
 
@@ -136,14 +151,14 @@ class File:
         except AttributeError:
             return False
 
-    @property
+    @cached_property
     def stat(self) -> Union[os.stat_result, paramiko.SFTPAttributes]:
         return self._local.sftp.stat(self.path) if self.remote else os.stat(self.path)
 
-    @property
+    @cached_property
     def size(self) -> int:
         return self.stat.st_size  # type: ignore
 
-    @property
+    @cached_property
     def is_block_device(self) -> bool:
         return stat.S_ISBLK(self.stat.st_mode)  # type: ignore
