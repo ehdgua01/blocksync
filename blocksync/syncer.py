@@ -129,6 +129,10 @@ class Syncer(object):
         self._create.clear()
         self._suspend.set()
 
+        if self.source.is_block_device:
+            workers = 1
+            self._logger.info("Run with 1 worker if source(or definition) device is block device(special device)")
+
         self._worker_threads = [
             threading.Thread(
                 target=self._sync,
@@ -163,6 +167,24 @@ class Syncer(object):
             worker.join()
         return self
 
+    def _pre_sync(self, worker_id: int, create: bool = False):
+        self.source.do_open()
+        try:
+            self.destination.do_open()
+        except FileNotFoundError:
+            if not create:
+                raise
+            if worker_id != 1:
+                self._create.wait()
+            self.destination.do_create(self.source.size)
+            self._create.set()
+            self.destination.do_close().do_open()
+        if self.source.size != self.destination.size:
+            if not self.source.is_block_device:
+                raise ValueError(f"[Worker {worker_id}]: Size not same")
+        if worker_id == 1 and not self.source.is_block_device:
+            self._blocks["size"] = self.source.size
+
     def _sync(
         self,
         worker_id: int,
@@ -172,27 +194,10 @@ class Syncer(object):
         create: bool = False,
         interval: Union[float, int] = 1,
         pause: Union[float, int] = 0.1,
-    ) -> None:
-        try:
-            self.source.do_open()
-            try:
-                self.destination.do_open()
-            except FileNotFoundError:
-                if create:
-                    if worker_id == 1:
-                        self.destination.do_create(self.source.size)
-                        self._create.set()
-                    else:
-                        self._create.wait()
-                    self.destination.do_close().do_open()
-                else:
-                    raise
-
-            if self.source.size != self.destination.size:
-                raise ValueError(f"[Worker {worker_id}]: Size not same")
-            elif self._blocks["size"] == -1:
-                self._blocks["size"] = self.source.size
-
+    ):
+        self._pre_sync(worker_id, create)
+        end_pos = 0
+        if not self.source.is_block_device:
             chunk_size = self.source.size // workers
             end_pos = chunk_size * worker_id
             if 1 < worker_id:
@@ -202,52 +207,48 @@ class Syncer(object):
                 if worker_id == workers:
                     end_pos += self.source.size % workers
 
-            self._log(worker_id, f"Start sync {self.source} to {self.destination}")
+        self._log(worker_id, f"Start sync {self.source} to {self.destination}")
 
-            if self.before:
-                self.before(self._blocks)
+        if self.before:
+            self.before(self._blocks)
 
-            t_last = timer()
-            try:
-                for source_block, dest_block in zip(
-                    self.source.get_blocks(block_size),
-                    self.destination.get_blocks(block_size),
-                ):
-                    if not self._suspend.is_set():
-                        self._log(worker_id, "Suspending...")
-                        self._suspend.wait()
-                    if self._cancel:
-                        raise CancelSync("Synchronization task has been canceled")
-                    if self._hash(source_block) == self._hash(dest_block):
-                        self._add_block("same")
-                    else:
-                        self._add_block("diff")
-                        if not dryrun:
-                            offset = min(len(source_block), block_size)
-                            self.destination.execute("seek", -offset, os.SEEK_CUR).execute(
-                                "write", source_block
-                            ).execute("flush")
-                    if interval <= timer() - t_last:
-                        if self.monitor:
-                            self.monitor(self._blocks)
-                        t_last = timer()
-                    if end_pos <= self.source.execute_with_result("tell"):
-                        self._log(worker_id, "!!! Done !!!")
-                        break
-                    if 0 < pause:
-                        time.sleep(pause)
-                if self.after:
-                    self.after(self._blocks)
-            except CancelSync as e:
-                self._log(worker_id, str(e))
-            except Exception as e:
-                self._log(worker_id, str(e), level=logging.ERROR, exc_info=True)
-                self._logger.error(e, exc_info=True)
-                if self.on_error:
-                    return self.on_error(e, self._blocks)
-        finally:
-            self.source.do_close()
-            self.destination.do_close()
+        t_last = timer()
+        try:
+            for source_block, dest_block in zip(
+                self.source.get_blocks(block_size),
+                self.destination.get_blocks(block_size),
+            ):
+                if not self._suspend.is_set():
+                    self._log(worker_id, "Suspending...")
+                    self._suspend.wait()
+                if self._cancel:
+                    raise CancelSync("Synchronization task has been canceled")
+                if self._hash(source_block) == self._hash(dest_block):
+                    self._add_block("same")
+                else:
+                    self._add_block("diff")
+                    if not dryrun:
+                        offset = min(len(source_block), block_size)
+                        self.destination.execute("seek", -offset, os.SEEK_CUR).execute("write", source_block).execute(
+                            "flush"
+                        )
+                if interval <= timer() - t_last:
+                    if self.monitor:
+                        self.monitor(self._blocks)
+                    t_last = timer()
+                if end_pos and end_pos <= self.source.execute_with_result("tell"):
+                    self._log(worker_id, "!!! Done !!!")
+                    break
+                if 0 < pause:
+                    time.sleep(pause)
+            if self.after:
+                self.after(self._blocks)
+        except CancelSync as e:
+            self._log(worker_id, str(e))
+        except Exception as e:
+            self._log(worker_id, str(e), level=logging.ERROR, exc_info=True)
+            if self.on_error:
+                self.on_error(e, self._blocks)
 
     def get_rate(self, block_size: int = UNITS["MiB"]) -> float:
         if self._blocks["done"] < 1:
