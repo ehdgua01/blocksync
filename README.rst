@@ -4,7 +4,7 @@ blocksync
 Blocksync Python package allows `blocksync script`_ to be used as Python packages,
 and supports more convenient and various functions than blocksync script.
 
-.. _blocksync script: http://https://github.com/theraser/blocksync
+.. _blocksync script: https://github.com/theraser/blocksync
 
 .. image:: https://travis-ci.com/ehdgua01/blocksync.svg?branch=master
     :target: https://travis-ci.com/ehdgua01/blocksync
@@ -46,13 +46,6 @@ Notes
 
 .. _block device(or special device): https://en.wikipedia.org/wiki/Device_file
 .. _description: https://docs.python.org/3/library/stat.html#stat.ST_CTIME
-
-Examples
---------
-Please refer to `examples`_ and `tests`_ at the beginning.
-
-.. _examples: https://github.com/ehdgua01/blocksync/tree/master/examples
-.. _tests: https://github.com/ehdgua01/blocksync/tree/master/tests
 
 License
 -------
