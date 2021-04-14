@@ -5,12 +5,10 @@ __all__ = ["Events"]
 
 class Events:
     def __init__(self):
-        self.pre_event: threading.Event = threading.Event()
         self.suspend_event: threading.Event = threading.Event()
         self.canceled: bool = False
 
     def initialize(self):
-        self.pre_event.clear()
         self.suspend_event.set()
         self.canceled = False
 
@@ -27,5 +25,5 @@ class Events:
         self.suspend_event.wait()
 
     @property
-    def is_suspended(self):
+    def suspended(self):
         return not self.suspend_event.is_set()
