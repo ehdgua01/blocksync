@@ -46,10 +46,8 @@ class File(abc.ABC):
         self._local.io = io
         return self
 
-    def get_blocks(self, block_size: int = ByteSizes.MiB) -> Generator[Optional[bytes], None, None]:
-        if not self.opened:
-            return
-        while block := self.get_block(block_size):
+    def get_blocks(self, block_size: int = ByteSizes.MiB) -> Generator[bytes, None, None]:
+        while self.opened and (block := self.get_block(block_size)):
             yield block
 
     def get_block(self, block_size: int = ByteSizes.MiB) -> Optional[bytes]:

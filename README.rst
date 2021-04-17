@@ -34,10 +34,7 @@ Features
 * Most methods support method chaining.
 * You can see the overall progress in a multi-threaded environment.
 * You can proceed synchronization in the background.
-* You can multi hash when comparing data. (you can use all hash algorithm supported by `hashlib`_)
 * You can specify the number of workers (number of threads) to perform synchronization.
-
-.. _hashlib: https://docs.python.org/3/library/hashlib.html
 
 Notes
 -------------
