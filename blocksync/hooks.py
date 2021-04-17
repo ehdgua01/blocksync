@@ -7,7 +7,9 @@ __all__ = ["Hooks"]
 
 class Hooks:
     def __init__(self):
+        self.root_before: Optional[Callable] = None
         self.before: Optional[Callable] = None
+        self.root_after: Optional[Callable] = None
         self.after: Optional[Callable] = None
         self.monitor: Optional[Callable] = None
         self.on_error: Optional[Callable] = None
@@ -18,8 +20,14 @@ class Hooks:
         except TypeError:
             pass
 
-    def run_before(self, blocks: Blocks):
-        self._run(self.before, blocks)
+    def run_root_before(self):
+        self._run(self.root_before)
+
+    def run_before(self):
+        self._run(self.before)
+
+    def run_root_after(self, blocks: Blocks):
+        self._run(self.root_after, blocks)
 
     def run_after(self, blocks: Blocks):
         self._run(self.after, blocks)
