@@ -62,3 +62,7 @@ def test_ssh_connected(stub_ssh_client):
     # Expect: Return False when SSH not connected
     stub_ssh_client.get_transport.return_value.is_active.return_value = False
     assert not file.ssh_connected
+
+    # Expect: Return False when SSH hasn't transport
+    stub_ssh_client.get_transport.return_value = None
+    assert not file.ssh_connected
