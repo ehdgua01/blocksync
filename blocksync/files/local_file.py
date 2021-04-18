@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 from typing import IO
 
 from blocksync.files.interfaces import File
@@ -16,4 +17,4 @@ class LocalFile(File):
         return self
 
     def _open(self, mode: str) -> IO:
-        return open(self.path, mode=mode)
+        return io.open(self.path, mode=mode)

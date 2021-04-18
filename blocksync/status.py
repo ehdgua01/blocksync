@@ -10,9 +10,9 @@ class Blocks(TypedDict):
     done: int
 
 
-class Status(threading.Lock):
+class Status:
     def __init__(self):
-        super(Status, self).__init__()
+        self._lock = threading.Lock()
         self.block_size: int = 0
         self.source_size: int = 0
         self.destination_size: int = 0
@@ -27,7 +27,7 @@ class Status(threading.Lock):
     def add_block(self, block_type: BlockTypes):
         if block_type == "done":
             raise ValueError("DONE blocks are automatically calculated.")
-        with self:
+        with self._lock:
             self.blocks[block_type] += 1
             self.blocks["done"] = self.blocks["same"] + self.blocks["diff"]
 

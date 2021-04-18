@@ -1,12 +1,16 @@
+from __future__ import annotations
+
 import logging
 import os
 import threading
 import time
 from timeit import default_timer as timer
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
-from blocksync import Syncer
-from blocksync.files.interfaces import File
+from blocksync.files import File
+
+if TYPE_CHECKING:
+    from blocksync import Syncer
 
 __all__ = ["Worker"]
 

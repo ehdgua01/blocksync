@@ -18,9 +18,8 @@ class LocalThreadVars(threading.local):
 
 
 class File(abc.ABC):
-    _local: LocalThreadVars = LocalThreadVars()
-
     def __init__(self, path: Union[Path, str]):
+        self._local: LocalThreadVars = LocalThreadVars()
         self.path = path
         self.size: int = 0
 
@@ -64,5 +63,7 @@ class File(abc.ABC):
         return self._local.io
 
     @property
-    def opened(self) -> Optional[bool]:
-        return not self.io.closed if self.io else False
+    def opened(self) -> bool:
+        if io := self.io:
+            return not io.closed
+        return False
