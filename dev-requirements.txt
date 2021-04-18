@@ -8,3 +8,4 @@ pytest-cov
 codecov
 pre-commit
 pytest-socket
+pytest-mock
