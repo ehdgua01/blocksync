@@ -7,6 +7,8 @@ import paramiko
 
 from blocksync.files.interfaces import File
 
+__all__ = ["SFTPFile"]
+
 
 class SFTPFile(File):
     def __init__(self, path: Union[Path, str], **ssh_options):
