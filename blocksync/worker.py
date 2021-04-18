@@ -25,7 +25,6 @@ class Worker(threading.Thread):
         dest: File,
         startpos: int,
         endpos: int,
-        block_size: int,
         dryrun: bool,
         sync_interval: Union[int, float],
         monitoring_interval: Union[int, float],
@@ -41,7 +40,6 @@ class Worker(threading.Thread):
         self.dest: File = dest
         self.startpos: int = startpos
         self.endpos: int = endpos
-        self.block_size: int = block_size
         self.dryrun: bool = dryrun
         self.sync_interval = sync_interval
         self.monitoring_interval = monitoring_interval
@@ -87,8 +85,8 @@ class Worker(threading.Thread):
         t_last = timer()
         try:
             for source_block, dest_block in zip(
-                self.src.get_blocks(self.block_size),
-                self.dest.get_blocks(self.block_size),
+                self.src.get_blocks(self.syncer.status.block_size),
+                self.dest.get_blocks(self.syncer.status.block_size),
             ):
                 if not self.syncer.events.suspended.is_set():
                     self._log("Suspending...")
@@ -101,7 +99,7 @@ class Worker(threading.Thread):
                 else:
                     self.syncer.status.add_block("diff")
                     if not self.dryrun:
-                        offset = min(len(source_block), self.block_size)
+                        offset = min(len(source_block), self.syncer.status.block_size)
                         self.dest.io.seek(-offset, os.SEEK_CUR)  # type: ignore[union-attr]
                         self.dest.io.write(source_block)  # type: ignore[union-attr]
                         self.dest.io.flush()  # type: ignore[union-attr]
