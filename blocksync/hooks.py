@@ -15,10 +15,8 @@ class Hooks:
         self.on_error: Optional[Callable] = None
 
     def _run(self, hook: Optional[Callable], *args, **kwargs):
-        try:
-            hook(*args, **kwargs)  # type: ignore[misc]
-        except TypeError:
-            pass
+        if hook:
+            hook(*args, **kwargs)
 
     def run_root_before(self):
         self._run(self.root_before)
