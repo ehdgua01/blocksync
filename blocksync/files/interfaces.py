@@ -26,9 +26,12 @@ class File(abc.ABC):
     def __repr__(self):
         return f"<{self.__class__.__name__} path={self.path} opened={self.opened}>"
 
-    @abc.abstractmethod
     def do_close(self, flush: bool = True) -> File:
-        pass
+        if self.opened:
+            if flush:
+                self.io.flush()  # type: ignore[union-attr]
+            self.io.close()  # type: ignore[union-attr]
+        return self
 
     def do_create(self, size: int) -> File:
         with self._open(mode="w") as f:
