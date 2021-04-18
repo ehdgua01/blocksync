@@ -39,8 +39,6 @@ class File(abc.ABC):
         return self
 
     def do_open(self) -> File:
-        if self.opened:
-            return self
         io = self._open(mode="rb+")
         io.seek(os.SEEK_SET, os.SEEK_END)
         self.size = io.tell()
@@ -53,13 +51,11 @@ class File(abc.ABC):
             yield block
 
     def get_block(self, block_size: int = ByteSizes.MiB) -> Optional[bytes]:
-        if not (self.opened and self.io):
-            return None
-        return self.io.read(block_size)
+        return self.io.read(block_size) if self.opened and self.io else None
 
     @abc.abstractmethod
     def _open(self, mode: str) -> Union[IO, paramiko.SFTPFile]:
-        pass
+        raise NotImplementedError
 
     @property
     def io(self) -> Optional[Union[IO, paramiko.SFTPFile]]:
