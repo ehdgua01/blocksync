@@ -24,9 +24,7 @@ class Status:
         self.destination_size = destination_size
         self.blocks = Blocks(same=0, diff=0, done=0)
 
-    def add_block(self, block_type: BlockTypes):
-        if block_type == "done":
-            raise ValueError("DONE blocks are automatically calculated.")
+    def add_block(self, block_type: Literal["same", "diff"]):
         with self._lock:
             self.blocks[block_type] += 1
             self.blocks["done"] = self.blocks["same"] + self.blocks["diff"]
