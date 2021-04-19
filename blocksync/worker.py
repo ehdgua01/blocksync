@@ -35,7 +35,6 @@ class Worker(threading.Thread):
         super().__init__(*args, **kwargs)
         self.worker_id = worker_id
         self.syncer: Syncer = syncer
-        self.create: bool = create
         self.src: File = src
         self.dest: File = dest
         self.startpos: int = startpos
@@ -48,36 +47,15 @@ class Worker(threading.Thread):
     def run(self):
         self.syncer.hooks.run_root_before()
         try:
-            self._pre_sync()
             self._sync()
-            self.syncer.hooks.run_root_after(self.syncer.status.blocks)
+            self.syncer.hooks.run_root_after(self.syncer.status)
         finally:
             self.src.do_close()
             self.dest.do_close()
 
-    def _pre_sync(self):
-        self.syncer.status.source_size = self.src.do_open().size
-        try:
-            self.dest.do_open()
-        except FileNotFoundError:
-            if not self.create:
-                raise
-            if self.syncer.events.prepared.is_set():
-                self.syncer.events.prepared.clear()
-                self.dest.do_create(self.src.size).do_open()
-                self.syncer.events.prepared.set()
-            else:
-                self.syncer.events.prepared.wait()
-        self.syncer.status.destination_size = self.dest.size
-        if self.src.size != self.dest.size:
-            self._log(
-                f"Source size({self.src.size}) is {'bigger' if self.src.size > self.dest.size else 'smaller'} "
-                f"than destination size({self.dest.size})"
-            )
-
     def _sync(self):
-        self.src.io.seek(self.startpos)  # type: ignore[union-attr]
-        self.dest.io.seek(self.startpos)  # type: ignore[union-attr]
+        self.src.do_open().io.seek(self.startpos)  # type: ignore[union-attr]
+        self.dest.do_open().io.seek(self.startpos)  # type: ignore[union-attr]
 
         self._log(f"Start sync {self.src} to {self.dest}")
         self.syncer.hooks.run_before()
@@ -95,26 +73,26 @@ class Worker(threading.Thread):
                     self._log("Synchronization task has been canceled")
                     return
                 if source_block == dest_block:
-                    self.syncer.status.add_block("same")
+                    self.syncer.status._add_block("same")
                 else:
-                    self.syncer.status.add_block("diff")
+                    self.syncer.status._add_block("diff")
                     if not self.dryrun:
                         offset = min(len(source_block), self.syncer.status.block_size)
                         self.dest.io.seek(-offset, os.SEEK_CUR)  # type: ignore[union-attr]
                         self.dest.io.write(source_block)  # type: ignore[union-attr]
                         self.dest.io.flush()  # type: ignore[union-attr]
                 if self.monitoring_interval <= timer() - t_last:
-                    self.syncer.hooks.run_monitor(self.syncer.status.blocks)
+                    self.syncer.hooks.run_monitor(self.syncer.status)
                     t_last = timer()
                 if self.endpos <= self.src.io.tell():  # type: ignore[union-attr]
                     self._log("!!! Done !!!")
                     break
                 if 0 < self.sync_interval:
                     time.sleep(self.sync_interval)
-            self.syncer.hooks.run_after(self.syncer.status.blocks)
+            self.syncer.hooks.run_after(self.syncer.status)
         except Exception as e:
             self._log(str(e), level=logging.ERROR, exc_info=True)
-            self.syncer.hooks.run_on_error(e, self.syncer.status.blocks)
+            self.syncer.hooks.run_on_error(e, self.syncer.status)
 
     def _log(self, msg: str, level=logging.INFO, *args, **kwargs):
         self.logger.log(level, f"[Worker {self.worker_id}]: {msg}", *args, **kwargs)

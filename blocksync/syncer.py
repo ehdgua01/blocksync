@@ -23,12 +23,12 @@ blocksync_logger.addHandler(logging.StreamHandler())
 
 class Syncer:
     def __init__(self, source: File, destination: File) -> None:
-        self.source = source
-        self.destination = destination
+        self.src = source
+        self.dest = destination
 
-        self.status = Status()
-        self.events = Events()
-        self.hooks = Hooks()
+        self.status: Status = Status()
+        self.events: Events = Events()
+        self.hooks: Hooks = Hooks()
 
         self.logger: logging.Logger = blocksync_logger
 
@@ -36,7 +36,7 @@ class Syncer:
         self._workers: List[threading.Thread] = []
 
     def __repr__(self):
-        return f"<blocksync.Syncer source={self.source} destination={self.destination}>"
+        return f"<blocksync.Syncer source={self.src} destination={self.dest}>"
 
     def start_sync(
         self,
@@ -50,7 +50,8 @@ class Syncer:
     ) -> Syncer:
         if workers < 1:
             raise ValueError("Workers must be bigger than 1")
-        self.status.initialize(block_size=block_size)
+        self._pre_sync(create)
+        self.status.initialize(block_size=block_size, source_size=self.src.size, destination_size=self.dest.size)
         self.events.initialize()
         self._workers = []
         for i in range(1, workers + 1):
@@ -59,8 +60,8 @@ class Syncer:
                 worker_id=i,
                 syncer=self,
                 create=create,
-                src=self.source,
-                dest=self.destination,
+                src=self.src,
+                dest=self.dest,
                 block_size=block_size,
                 startpos=startpos,
                 endpos=endpos,
@@ -76,14 +77,27 @@ class Syncer:
             self.wait()
         return self
 
+    def _pre_sync(self, create: bool = False):
+        self.src.do_open()
+        try:
+            self.dest.do_open()
+        except FileNotFoundError:
+            if not create:
+                raise
+            self.dest.do_create(self.src.size).do_open()
+        if self.src.size > self.dest.size:
+            self.logger.warning(f"Source size({self.src.size}) is greater than destination size({self.dest.size})")
+        elif self.src.size < self.dest.size:
+            self.logger.info(f"Source size({self.src.size}) is less than destination size({self.dest.size})")
+
     def _get_positions(self, workers: int, worker_id: int) -> Tuple[int, int]:
-        chunk_size = self.source.size // workers
+        chunk_size = self.src.size // workers
         start = os.SEEK_SET
         end = chunk_size * worker_id
         if 1 < worker_id:
             start = chunk_size * (worker_id - 1)
         if worker_id == workers:
-            end += self.source.size % workers
+            end += self.src.size % workers
         return start, end
 
     def wait(self) -> Syncer:

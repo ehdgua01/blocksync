@@ -1,6 +1,6 @@
 from typing import Callable, Optional
 
-from blocksync.status import Blocks
+from blocksync.status import Status
 
 __all__ = ["Hooks"]
 
@@ -24,14 +24,14 @@ class Hooks:
     def run_before(self):
         self._run(self.before)
 
-    def run_root_after(self, blocks: Blocks):
-        self._run(self.root_after, blocks)
+    def run_root_after(self, status: Status):
+        self._run(self.root_after, status)
 
-    def run_after(self, blocks: Blocks):
-        self._run(self.after, blocks)
+    def run_after(self, status: Status):
+        self._run(self.after, status)
 
-    def run_monitor(self, blocks: Blocks):
-        self._run(self.monitor, blocks)
+    def run_monitor(self, status: Status):
+        self._run(self.monitor, status)
 
-    def run_on_error(self, exc: Exception, blocks: Blocks):
-        self._run(self.on_error, exc, blocks)
+    def run_on_error(self, exc: Exception, status: Status):
+        self._run(self.on_error, exc, status)
