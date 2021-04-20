@@ -11,10 +11,9 @@ from blocksync.events import Events
 from blocksync.files.interfaces import File
 from blocksync.hooks import Hooks
 from blocksync.status import Status
+from blocksync.worker import Worker
 
 __all__ = ["Syncer"]
-
-from blocksync.worker import Worker
 
 blocksync_logger = logging.getLogger(__name__)
 blocksync_logger.setLevel(logging.INFO)
@@ -49,7 +48,7 @@ class Syncer:
         monitoring_interval: Union[float, int] = 1,
     ) -> Syncer:
         if workers < 1:
-            raise ValueError("Workers must be bigger than 1")
+            raise ValueError("Workers must be greater than 1")
         self._pre_sync(create)
         self.status.initialize(block_size=block_size, source_size=self.src.size, destination_size=self.dest.size)
         self.events.initialize()
@@ -59,7 +58,6 @@ class Syncer:
             worker = Worker(
                 worker_id=i,
                 syncer=self,
-                create=create,
                 src=self.src,
                 dest=self.dest,
                 block_size=block_size,
@@ -107,11 +105,13 @@ class Syncer:
         return self
 
     def suspend(self) -> Syncer:
-        self.events.suspended.clear()
+        if self.events.suspended.is_set():
+            self.events.suspended.clear()
         return self
 
     def resume(self) -> Syncer:
-        self.events.suspended.set()
+        if not self.events.suspended.is_set():
+            self.events.suspended.set()
         return self
 
     @property

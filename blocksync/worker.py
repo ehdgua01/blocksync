@@ -20,7 +20,6 @@ class Worker(threading.Thread):
         self,
         worker_id: int,
         syncer: Syncer,
-        create: bool,
         src: File,
         dest: File,
         startpos: int,
