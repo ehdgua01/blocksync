@@ -14,8 +14,8 @@ def mock_worker(mocker):
 def mock_syncer():
     syncer = Syncer(Mock(), Mock())
     syncer.src.size = syncer.dest.size = 10
+    syncer._suspended = Mock()
     syncer.status = Mock()
-    syncer.events = Mock()
     syncer.hooks = Mock()
     syncer.logger = Mock()
     return syncer
@@ -80,16 +80,14 @@ def test_start_sync(mock_syncer, mock_worker):
         sync_interval=1,
         monitoring_interval=1,
     )
+    assert not mock_syncer.canceled
     mock_syncer._pre_sync.assert_called_once_with(False)
     mock_syncer.status.initialize.assert_called_once_with(block_size=1, source_size=10, destination_size=10)
-    mock_syncer.events.initialize.assert_called_once()
+    mock_syncer.suspended.set.assert_called_once()
     worker_instance = mock_worker.return_value
     mock_worker.assert_called_once_with(
         worker_id=1,
         syncer=mock_syncer,
-        src=mock_syncer.src,
-        dest=mock_syncer.dest,
-        block_size=1,
         startpos=0,
         endpos=10,
         dryrun=False,
@@ -137,25 +135,29 @@ def test_wait(mock_syncer, mock_worker):
     assert mock_worker.return_value.join.call_count == 2
 
 
+def test_cancel(mock_syncer):
+    assert mock_syncer.cancel()._canceled
+
+
 def test_suspend(mock_syncer):
     # Expect: Suspend when not blocking
-    mock_syncer.events.suspended.is_set.return_value = True
+    mock_syncer._suspended.is_set.return_value = True
     mock_syncer.suspend()
-    mock_syncer.events.suspended.clear.assert_called_once()
-    mock_syncer.events.suspended.reset_mock()
+    mock_syncer._suspended.clear.assert_called_once()
+    mock_syncer._suspended.reset_mock()
 
-    mock_syncer.events.suspended.is_set.return_value = False
+    mock_syncer._suspended.is_set.return_value = False
     mock_syncer.suspend()
-    mock_syncer.events.suspended.clear.assert_not_called()
+    mock_syncer._suspended.clear.assert_not_called()
 
 
 def test_resume(mock_syncer):
     # Expect: Resume when blocking
-    mock_syncer.events.suspended.is_set.return_value = False
+    mock_syncer._suspended.is_set.return_value = False
     mock_syncer.resume()
-    mock_syncer.events.suspended.set.assert_called_once()
-    mock_syncer.events.suspended.reset_mock()
+    mock_syncer._suspended.set.assert_called_once()
+    mock_syncer._suspended.reset_mock()
 
-    mock_syncer.events.suspended.is_set.return_value = True
+    mock_syncer._suspended.is_set.return_value = True
     mock_syncer.resume()
-    mock_syncer.events.suspended.set.assert_not_called()
+    mock_syncer._suspended.set.assert_not_called()

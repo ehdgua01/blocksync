@@ -7,7 +7,6 @@ import threading
 from typing import List, Tuple, Union
 
 from blocksync.consts import ByteSizes
-from blocksync.events import Events
 from blocksync.files.interfaces import File
 from blocksync.hooks import Hooks
 from blocksync.status import Status
@@ -26,12 +25,13 @@ class Syncer:
         self.dest = destination
 
         self.status: Status = Status()
-        self.events: Events = Events()
         self.hooks: Hooks = Hooks()
 
         self.logger: logging.Logger = blocksync_logger
 
-        self._started = False
+        self._started: bool = False
+        self._canceled: bool = False
+        self._suspended: threading.Event = threading.Event()
         self._workers: List[threading.Thread] = []
 
     def __repr__(self):
@@ -49,18 +49,16 @@ class Syncer:
     ) -> Syncer:
         if workers < 1:
             raise ValueError("Workers must be greater than 1")
+        self._canceled = False
+        self.suspended.set()
         self._pre_sync(create)
         self.status.initialize(block_size=block_size, source_size=self.src.size, destination_size=self.dest.size)
-        self.events.initialize()
         self._workers = []
         for i in range(1, workers + 1):
             startpos, endpos = self._get_positions(workers, i)
             worker = Worker(
                 worker_id=i,
                 syncer=self,
-                src=self.src,
-                dest=self.dest,
-                block_size=block_size,
                 startpos=startpos,
                 endpos=endpos,
                 dryrun=dryrun,
@@ -104,15 +102,31 @@ class Syncer:
                 worker.join()
         return self
 
+    def cancel(self) -> Syncer:
+        self._canceled = True
+        return self
+
     def suspend(self) -> Syncer:
-        if self.events.suspended.is_set():
-            self.events.suspended.clear()
+        if self._suspended.is_set():
+            self._suspended.clear()
         return self
 
     def resume(self) -> Syncer:
-        if not self.events.suspended.is_set():
-            self.events.suspended.set()
+        if not self._suspended.is_set():
+            self._suspended.set()
         return self
+
+    @property
+    def workers(self) -> List[threading.Thread]:
+        return self._workers
+
+    @property
+    def suspended(self) -> threading.Event:
+        return self._suspended
+
+    @property
+    def canceled(self) -> bool:
+        return self._canceled
 
     @property
     def started(self) -> bool:
@@ -126,7 +140,3 @@ class Syncer:
             if worker.is_alive():
                 return False
         return True
-
-    @property
-    def workers(self) -> List[threading.Thread]:
-        return self._workers
