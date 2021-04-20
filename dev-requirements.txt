@@ -3,9 +3,7 @@ black
 flake8
 pyflakes>=2.2.0
 twine
-pytest
-pytest-cov
-codecov
 pre-commit
-pytest-socket
-pytest-mock
+wheel
+
+-r test-requirements
