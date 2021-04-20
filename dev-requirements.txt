@@ -6,4 +6,4 @@ twine
 pre-commit
 wheel
 
--r test-requirements
+-r test-requirements.txt
