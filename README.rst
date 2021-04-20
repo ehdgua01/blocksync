@@ -44,6 +44,12 @@ Notes
 .. _block device(or special device): https://en.wikipedia.org/wiki/Device_file
 .. _description: https://docs.python.org/3/library/stat.html#stat.ST_CTIME
 
+
+TODO
+-------------
+- [] Provide CLI
+- [] Write docs and build a docs website
+
 License
 -------
 MIT License (For more information about this license, please see `this`_)
