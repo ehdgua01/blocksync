@@ -11,12 +11,6 @@ and supports more convenient and various functions than blocksync script.
 
 - Python 3.8 or later
 
-# Installation
-
-```bash
-pip install blocksync
-```
-
 # Features
 
 - Synchronize the destination (remote or local) files using an incremental algorithm.
@@ -27,6 +21,34 @@ pip install blocksync
 - You can see the overall progress in a multi-threaded environment.
 - You can proceed synchronization in the background.
 - You can specify the number of workers (number of threads) to perform synchronization.
+
+# Installation
+
+```bash
+pip install blocksync
+```
+
+# Quick start
+
+When using SFTP files, you can check the SSH connection options in [paramiko docs](http://docs.paramiko.org/en/stable/api/client.html#paramiko.client.SSHClient).
+
+```python
+from blocksync import LocalFile, SFTPFile, Syncer
+
+
+syncer = Syncer(
+    src=SFTPFile(
+        path="src.file",
+        hostname="hostname",
+        username="username",
+        password="password",
+        key_filename="key_filepath",
+    ),
+    dest=LocalFile(path="dest.file"),
+)
+syncer.start_sync(workers=2, create=True, wait=True)
+```
+
 
 # TODO
 - [ ] Provide CLI
