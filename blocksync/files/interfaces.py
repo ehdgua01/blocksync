@@ -20,7 +20,7 @@ class LocalThreadVars(threading.local):
 class File(abc.ABC):
     def __init__(self, path: Union[Path, str]):
         self._local: LocalThreadVars = LocalThreadVars()
-        self.path = path
+        self.path: Union[Path, str] = path
         self.size: int = 0
 
     def __repr__(self):
@@ -39,11 +39,9 @@ class File(abc.ABC):
         return self
 
     def do_open(self) -> File:
-        io = self._open(mode="rb+")
-        io.seek(os.SEEK_SET, os.SEEK_END)
-        self.size = io.tell()
-        io.seek(os.SEEK_SET)
-        self._local.io = io
+        fileobj = self._open(mode="rb+")
+        self._local.io = fileobj
+        self.size = self._get_size(fileobj)
         return self
 
     def get_blocks(self, block_size: int = ByteSizes.MiB) -> Generator[bytes, None, None]:
@@ -56,6 +54,12 @@ class File(abc.ABC):
     @abc.abstractmethod
     def _open(self, mode: str) -> Union[IO, paramiko.SFTPFile]:
         raise NotImplementedError
+
+    def _get_size(self, fileobj: Union[IO, paramiko.SFTPFile]) -> int:
+        fileobj.seek(os.SEEK_SET, os.SEEK_END)
+        size = fileobj.tell()
+        fileobj.seek(os.SEEK_SET)
+        return size
 
     @property
     def io(self) -> Optional[Union[IO, paramiko.SFTPFile]]:

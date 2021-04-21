@@ -16,6 +16,29 @@ def stub_ssh_client(mocker):
     return ssh_client.return_value
 
 
+@pytest.fixture
+def stub_sftp_client(stub_ssh_client):
+    return stub_ssh_client.open_sftp.return_value
+
+
+def test_target_file_is_a_block_device(mocker, stub_ssh_client, stub_sftp_client):
+    # When: The target file is a block device
+    stub_ssh_client.exec_command.return_value = (Mock(), Mock(read=Mock(return_value=b"10")), Mock())
+    mocker.patch("blocksync.files.sftp_file.File._get_size", return_value=0)
+    stub_sftp_client.open.return_value.stat.return_value.st_mode = 25008
+    file = SFTPFile("filepath")
+
+    # Then: Use a special command to get the size of the block device
+    assert file.do_open().size == 10
+    stub_ssh_client.exec_command.assert_called_once_with(
+        """python -c "with open('filepath', 'r') as f: f.seek(0, 2); print(f.tell())" """
+    )
+
+    # And: Return if already got the size
+    mocker.patch("blocksync.files.sftp_file.File._get_size", return_value=1)
+    assert file.do_open().size == 1
+
+
 def test_do_close(mocker, stub_ssh_client):
     # Expect: Close only when ssh connected
     mock_do_close = mocker.patch("blocksync.files.sftp_file.File.do_close")

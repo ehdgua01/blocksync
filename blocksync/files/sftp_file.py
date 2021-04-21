@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import stat
 from pathlib import Path
 from typing import Union
 
@@ -28,6 +29,15 @@ class SFTPFile(File):
         if self.ssh_connected and (sftp := self._ssh.open_sftp()):
             return sftp.open(self.path if isinstance(self.path, str) else str(self.path), mode=mode)
         raise ValueError("Cannot open the remote file. Please connect paramiko.SSHClient")
+
+    def _get_size(self, fileobj: paramiko.SFTPFile) -> int:  # type: ignore[override]
+        size = super()._get_size(fileobj)
+        if size == 0 and stat.S_ISBLK(fileobj.stat().st_mode):  # type: ignore[arg-type]
+            stdin, stdout, stderr = self._ssh.exec_command(
+                f"""python -c "with open('{self.path}', 'r') as f: f.seek(0, 2); print(f.tell())" """,
+            )
+            return int(stdout.read())
+        return size
 
     @property
     def ssh_connected(self) -> bool:
