@@ -1,8 +1,8 @@
 # blocksync
 
-[![Build](https://travis-ci.com/ehdgua01/blocksync.svg?branch=master)](https://travis-ci.com/ehdgua01/blocksync.svg?branch=master)
-[![Coverage](https://codecov.io/gh/ehdgua01/blocksync/branch/master/graph/badge.svg)](https://codecov.io/gh/ehdgua01/blocksync/branch/master/graph/badge.svg)
-[![PyPi](https://badge.fury.io/py/blocksync.svg)](https://badge.fury.io/py/blocksync.svg)
+[![Build](https://travis-ci.com/ehdgua01/blocksync.svg?branch=master)](https://travis-ci.com/github/ehdgua01/blocksync)
+[![Coverage](https://codecov.io/gh/ehdgua01/blocksync/branch/master/graph/badge.svg)](https://app.codecov.io/gh/ehdgua01/blocksync)
+[![PyPi](https://badge.fury.io/py/blocksync.svg)](https://pypi.org/project/blocksync/)
 
 Blocksync Python package allows [blocksync script](https://github.com/theraser/blocksync) to be used as Python packages,
 and supports more convenient and various functions than blocksync script.
