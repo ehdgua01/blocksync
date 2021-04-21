@@ -70,7 +70,7 @@ class Worker(threading.Thread):
                 else:
                     self.syncer.status._add_block("diff")
                     if not self.dryrun:
-                        offset = min(len(source_block), self.syncer.status.block_size)
+                        offset = min(len(source_block), len(dest_block), self.syncer.status.block_size)
                         self.syncer.dest.io.seek(-offset, os.SEEK_CUR)  # type: ignore[union-attr]
                         self.syncer.dest.io.write(source_block)  # type: ignore[union-attr]
                         self.syncer.dest.io.flush()  # type: ignore[union-attr]
