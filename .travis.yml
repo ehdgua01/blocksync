@@ -1,6 +1,8 @@
 language: python
 
-python: "3.8"
+python:
+  - "3.8"
+  - "3.9"
 
 cache:
   directories:
@@ -8,13 +10,13 @@ cache:
     - $HOME/.cache/pre-commit
 
 install:
-  - .travis/install.sh
+  - pip install -r dev-requirements.txt
 
 before_script:
   - pre-commit run --all-files
 
 script:
-  - pytest
+  - tox
 
 after_script:
   - codecov

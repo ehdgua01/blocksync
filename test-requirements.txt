@@ -1,0 +1,8 @@
+tox
+tox-pyenv
+tox-travis
+pytest
+pytest-cov
+pytest-socket
+pytest-mock
+codecov

@@ -1,173 +1,163 @@
-import hashlib
-import logging
-import pathlib
-import signal
-import unittest
-import unittest.mock
-from contextlib import contextmanager
+from unittest.mock import Mock
 
-from blocksync import File, Syncer
-from blocksync.consts import UNITS
-from blocksync.utils import generate_random_data
+import pytest
+
+from blocksync.syncer import Syncer
 
 
-class TestCase(unittest.TestCase):
-    def setUp(self) -> None:
-        self.source = File("source.file")
-        self.destination = File("destination.file")
-        self.syncer = Syncer(self.source, self.destination)
+@pytest.fixture(autouse=True)
+def mock_worker(mocker):
+    return mocker.patch("blocksync.syncer.Worker")
 
-    def tearDown(self) -> None:
-        pathlib.Path(self.source.path).unlink(missing_ok=True)
-        pathlib.Path(self.destination.path).unlink(missing_ok=True)
 
-    def create_source_file(self, size: int) -> None:
-        self.source.do_create(size)
-        self.source.do_open().execute("write", generate_random_data(size).encode()).execute("flush")
-        self.source.do_close()
+@pytest.fixture
+def mock_syncer():
+    syncer = Syncer(Mock(), Mock())
+    syncer.src.size = syncer.dest.size = 10
+    syncer._suspended = Mock()
+    syncer.status = Mock()
+    syncer.hooks = Mock()
+    syncer.logger = Mock()
+    return syncer
 
-    @contextmanager
-    def timeout(self, time):
-        signal.signal(signal.SIGALRM, self.raise_timeout)
-        signal.alarm(time)
-        try:
-            yield
-        except TimeoutError:
-            pass
-        finally:
-            signal.signal(signal.SIGALRM, signal.SIG_IGN)
 
-    def raise_timeout(self, signum, frame) -> None:
-        raise TimeoutError()
+def test_raise_error_if_worker_less_than_1(mock_syncer):
+    with pytest.raises(ValueError, match="Workers must be greater than 1"):
+        mock_syncer.start_sync(workers=0)
 
-    def test_set_source(self) -> None:
-        self.assertEqual(self.syncer.set_source(self.source), self.syncer)
-        self.assertEqual(self.syncer.source, self.source)
 
-    def test_set_destination(self) -> None:
-        self.assertEqual(self.syncer.set_destination(self.destination), self.syncer)
-        self.assertEqual(self.syncer.destination, self.destination)
+def test_pre_sync(mock_syncer):
+    # Expect: Open both of target files
+    mock_syncer.src.size = mock_syncer.dest.size = 10
+    mock_syncer._pre_sync()
+    mock_syncer.src.do_open.assert_called_once()
+    mock_syncer.dest.do_open.assert_called_once()
 
-    def test_set_callbacks(self) -> None:
-        # before callback least requires 1 argument
-        def before(x):
-            return x
 
-        # after callback least requires 1 argument
-        def after(x):
-            return x
+def test_when_destination_file_does_not_exists(mock_syncer):
+    # Expect: Raise error if create is False
+    mock_syncer.dest.do_open.side_effect = FileNotFoundError
+    with pytest.raises(FileNotFoundError):
+        mock_syncer._pre_sync(create=False)
 
-        # monitor callback least requires 1 argument
-        def monitor(x):
-            return x
+    # Expect: Create an empty file with the size of the source
+    mock_syncer._pre_sync(create=True)
+    mock_syncer.dest.do_create.assert_called_once_with(10)
+    mock_syncer.dest.do_create.return_value.do_open.assert_called_once()
 
-        # on_error callback least requires 2 argument
-        def on_error(x, e):
-            return x, e
 
-        self.assertEqual(
-            self.syncer.set_callbacks(before=before, after=after, monitor=monitor, on_error=on_error),
-            self.syncer,
-        )
-        self.assertEqual(self.syncer.before, before)
-        self.assertEqual(self.syncer.after, after)
-        self.assertEqual(self.syncer.monitor, monitor)
-        self.assertEqual(self.syncer.on_error, on_error)
+def test_when_src_and_dest_file_size_does_not_same(mock_syncer):
+    # Expect: Call info with expected msg
+    mock_syncer.src.size = mock_syncer.dest.size - 1
+    mock_syncer._pre_sync()
+    mock_syncer.logger.info.assert_called_once_with("Source size(9) is less than destination size(10)")
 
-    def test_set_hash_algorithms(self) -> None:
-        with self.assertRaises(ValueError):
-            # Raise error when hash algorithm not supported by hashlib
-            self.syncer.set_hash_algorithms(["xxx"])
+    # Expect: Call warning with expected msg
+    mock_syncer.src.size = mock_syncer.dest.size + 1
+    mock_syncer._pre_sync()
+    mock_syncer.logger.warning.assert_called_once_with("Source size(11) is greater than destination size(10)")
 
-        algorithms = ["sha256", "md5", "blake2b"]
-        self.assertEqual(self.syncer.set_hash_algorithms(algorithms), self.syncer)
-        self.assertEqual(self.syncer.hash_algorithms, [getattr(hashlib, algo) for algo in algorithms])
-        self.create_source_file(10)
-        self.syncer.set_source(self.source).set_destination(self.destination).start_sync(create=True, wait=True)
-        self.assertEqual(self.syncer.blocks, {"size": 10, "same": 0, "diff": 1, "done": 1})
 
-    def test_set_logger(self) -> None:
-        logger = logging.Logger(__name__)
-        self.syncer.set_logger(logger)
-        self.assertEqual(self.syncer._logger, logger)
+def test_get_positions(mock_syncer):
+    # Expect: Return the correct positions
+    assert mock_syncer._get_positions(workers=1, worker_id=1) == (0, 10)
+    assert mock_syncer._get_positions(workers=2, worker_id=1) == (0, 5)
+    assert mock_syncer._get_positions(workers=2, worker_id=2) == (5, 10)
+    assert mock_syncer._get_positions(workers=3, worker_id=1) == (0, 3)
+    assert mock_syncer._get_positions(workers=3, worker_id=2) == (3, 6)
+    assert mock_syncer._get_positions(workers=3, worker_id=3) == (6, 10)
 
-    def test_start_sync(self) -> None:
-        mock_before = unittest.mock.MagicMock()
-        mock_after = unittest.mock.MagicMock()
-        mock_monitor = unittest.mock.MagicMock()
-        self.assertEqual(
-            self.syncer.set_callbacks(before=mock_before, after=mock_after, monitor=mock_monitor),
-            self.syncer,
-        )
 
-        size = UNITS["MiB"] * 10
-        self.create_source_file(size)
+def test_start_sync(mock_syncer, mock_worker):
+    mock_syncer._pre_sync = Mock()
+    mock_syncer.wait = Mock()
+    mock_syncer.start_sync(
+        workers=1,
+        block_size=1,
+        wait=True,
+        dryrun=False,
+        create=False,
+        sync_interval=1,
+        monitoring_interval=1,
+    )
+    assert not mock_syncer.canceled
+    mock_syncer._pre_sync.assert_called_once_with(False)
+    mock_syncer.status.initialize.assert_called_once_with(block_size=1, source_size=10, destination_size=10)
+    mock_syncer.suspended.set.assert_called_once()
+    worker_instance = mock_worker.return_value
+    mock_worker.assert_called_once_with(
+        worker_id=1,
+        syncer=mock_syncer,
+        startpos=0,
+        endpos=10,
+        dryrun=False,
+        sync_interval=1,
+        monitoring_interval=1,
+        logger=mock_syncer.logger,
+    )
+    mock_worker.return_value.start.assert_called_once()
+    mock_syncer.wait.assert_called_once()
+    assert mock_syncer.workers == [worker_instance]
+    assert mock_syncer.started
 
-        self.assertTrue(
-            self.syncer.set_hash_algorithms(["sha256"])
-            .start_sync(workers=5, block_size=UNITS["MiB"], interval=0, create=True)
-            .started,
-        )
-        self.assertFalse(self.syncer.finished)
-        self.assertEqual(self.syncer.wait(), self.syncer)
-        self.assertTrue(self.syncer.finished)
-        self.assertEqual(self.syncer.blocks, {"size": size, "same": 0, "diff": 10, "done": 10})
-        mock_before.assert_called_with(self.syncer.blocks)
-        mock_after.assert_called_with(self.syncer.blocks)
-        mock_monitor.assert_called_with(self.syncer.blocks)
+    # Expect: Create worker instances by number of workers
+    mock_syncer.start_sync(
+        workers=3,
+        block_size=1,
+        wait=True,
+        dryrun=False,
+        create=False,
+        sync_interval=1,
+        monitoring_interval=1,
+    )
+    assert mock_syncer.workers == [worker_instance, worker_instance, worker_instance]
 
-        self.assertEqual(
-            self.source.do_open().execute_with_result("read"),
-            self.destination.do_open().execute_with_result("read"),
-        )
 
-        self.assertTrue(
-            self.syncer.set_hash_algorithms(["sha256"])
-            .start_sync(workers=5, block_size=UNITS["MiB"], interval=0, wait=True)
-            .started,
-        )
-        self.assertEqual(self.syncer.blocks, {"size": size, "same": 10, "diff": 0, "done": 10})
-        self.source.do_close()
-        self.destination.do_close()
+def test_finished(mock_syncer, mock_worker):
+    # Expect: Return False before start
+    assert not mock_syncer.finished
+    mock_syncer.start_sync()
 
-    def test_cancel_sync(self) -> None:
-        self.create_source_file(1000)
-        with unittest.mock.patch.object(self.syncer, "_add_block") as mock_add_block:
-            self.assertEqual(
-                self.syncer.set_source(self.source).set_destination(self.destination).cancel(),
-                self.syncer,
-            )
-            self.syncer.start_sync(wait=True, create=True)
-            mock_add_block.assert_not_called()
+    # Expect: Return False if some worker is alive
+    mock_worker.return_value.is_alive.return_value = True
+    assert not mock_syncer.finished
 
-    def test_get_rate(self) -> None:
-        self.create_source_file(10)
-        self.assertEqual(self.syncer.get_rate(), 0.00)
-        self.syncer.set_source(self.source).set_destination(self.destination).start_sync(wait=True, create=True)
-        self.assertEqual(self.syncer.get_rate(), 100.00)
+    # Expect: Return True if all worker finished
+    mock_worker.return_value.is_alive.return_value = False
+    assert mock_syncer.finished
 
-    def test_dryrun(self) -> None:
-        self.create_source_file(10)
-        self.syncer.set_source(self.source).set_destination(self.destination).start_sync(
-            dryrun=True, wait=True, create=True
-        )
-        self.assertEqual(self.syncer.blocks, {"size": 10, "same": 0, "diff": 1, "done": 1})
-        self.assertNotEqual(
-            self.source.do_open().execute_with_result("read"),
-            self.destination.do_open().execute_with_result("read"),
-        )
 
-    def test_suspend_and_resume(self) -> None:
-        self.create_source_file(10)
-        with unittest.mock.patch.object(self.syncer._logger, "info") as mock_logger_info:
-            with self.timeout(3):
-                self.syncer.set_source(self.source).set_destination(self.destination).start_sync(create=True)
-                self.assertEqual(
-                    self.syncer.suspend(),
-                    self.syncer,
-                )
-                self.syncer.wait()
-            mock_logger_info.assert_called_with("[Worker {}]: Suspending...".format(1))
-            self.assertEqual(self.syncer.resume(), self.syncer)
-            self.syncer.wait()
-            self.assertEqual(self.syncer.blocks, {"size": 10, "same": 0, "diff": 1, "done": 1})
+def test_wait(mock_syncer, mock_worker):
+    # Expect: Wait all workers
+    mock_worker.return_value.is_alive.return_value = True
+    mock_syncer.start_sync(workers=2).wait()
+    assert mock_worker.return_value.is_alive.call_count == 2
+    assert mock_worker.return_value.join.call_count == 2
+
+
+def test_cancel(mock_syncer):
+    assert mock_syncer.cancel()._canceled
+
+
+def test_suspend(mock_syncer):
+    # Expect: Suspend when not blocking
+    mock_syncer._suspended.is_set.return_value = True
+    mock_syncer.suspend()
+    mock_syncer._suspended.clear.assert_called_once()
+    mock_syncer._suspended.reset_mock()
+
+    mock_syncer._suspended.is_set.return_value = False
+    mock_syncer.suspend()
+    mock_syncer._suspended.clear.assert_not_called()
+
+
+def test_resume(mock_syncer):
+    # Expect: Resume when blocking
+    mock_syncer._suspended.is_set.return_value = False
+    mock_syncer.resume()
+    mock_syncer._suspended.set.assert_called_once()
+    mock_syncer._suspended.reset_mock()
+
+    mock_syncer._suspended.is_set.return_value = True
+    mock_syncer.resume()
+    mock_syncer._suspended.set.assert_not_called()
