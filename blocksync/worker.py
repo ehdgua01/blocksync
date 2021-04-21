@@ -48,7 +48,9 @@ class Worker(threading.Thread):
         self.syncer.src.do_open().io.seek(self.startpos)  # type: ignore[union-attr]
         self.syncer.dest.do_open().io.seek(self.startpos)  # type: ignore[union-attr]
 
-        self._log(f"Start sync {self.syncer.src} to {self.syncer.dest}")
+        self._log(
+            f"Start sync(startpos: {self.startpos}, endpos: {self.endpos}) {self.syncer.src} to {self.syncer.dest}"
+        )
         self.syncer.hooks.run_before()
 
         t_last = timer()

@@ -66,7 +66,10 @@ def test_sync(stub_worker, mock_time):
 
     stub_worker.logger.log.assert_has_calls(
         [
-            call(logging.INFO, f"[Worker 1]: Start sync {stub_worker.syncer.src} to {stub_worker.syncer.dest}"),
+            call(
+                logging.INFO,
+                f"[Worker 1]: Start sync(startpos: 0, endpos: 5) {stub_worker.syncer.src} to {stub_worker.syncer.dest}",
+            ),
             call(logging.INFO, "[Worker 1]: !!! Done !!!"),
         ]
     )
