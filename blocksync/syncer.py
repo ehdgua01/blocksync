@@ -20,9 +20,9 @@ blocksync_logger.addHandler(logging.StreamHandler())
 
 
 class Syncer:
-    def __init__(self, source: File, destination: File) -> None:
-        self.src = source
-        self.dest = destination
+    def __init__(self, src: File, dest: File) -> None:
+        self.src = src
+        self.dest = dest
 
         self.status: Status = Status()
         self.hooks: Hooks = Hooks()
