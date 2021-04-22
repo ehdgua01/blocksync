@@ -87,7 +87,6 @@ class Worker(threading.Thread):
         except Exception as e:
             self._log(str(e), level=logging.ERROR, exc_info=True)
             self.syncer.hooks.run_on_error(e, self.syncer.status)
-        return
 
     def _log(self, msg: str, level: int = logging.INFO, *args, **kwargs):
         self.logger.log(level, f"[Worker {self.worker_id}]: {msg}", *args, **kwargs)
