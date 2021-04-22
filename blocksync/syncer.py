@@ -50,7 +50,7 @@ class Syncer:
         if workers < 1:
             raise ValueError("Workers must be greater than 1")
         self._canceled = False
-        self.suspended.set()
+        self._suspended.set()
         self._pre_sync(create)
         self.status.initialize(block_size=block_size, source_size=self.src.size, destination_size=self.dest.size)
         self._workers = []
@@ -121,8 +121,8 @@ class Syncer:
         return self._workers
 
     @property
-    def suspended(self) -> threading.Event:
-        return self._suspended
+    def suspended(self) -> bool:
+        return not self._suspended.is_set()
 
     @property
     def canceled(self) -> bool:

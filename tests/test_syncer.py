@@ -83,7 +83,7 @@ def test_start_sync(mock_syncer, mock_worker):
     assert not mock_syncer.canceled
     mock_syncer._pre_sync.assert_called_once_with(False)
     mock_syncer.status.initialize.assert_called_once_with(block_size=1, source_size=10, destination_size=10)
-    mock_syncer.suspended.set.assert_called_once()
+    mock_syncer._suspended.set.assert_called_once()
     worker_instance = mock_worker.return_value
     mock_worker.assert_called_once_with(
         worker_id=1,
@@ -148,6 +148,7 @@ def test_suspend(mock_syncer):
 
     mock_syncer._suspended.is_set.return_value = False
     mock_syncer.suspend()
+    assert mock_syncer.suspended
     mock_syncer._suspended.clear.assert_not_called()
 
 
@@ -160,4 +161,5 @@ def test_resume(mock_syncer):
 
     mock_syncer._suspended.is_set.return_value = True
     mock_syncer.resume()
+    assert not mock_syncer.suspended
     mock_syncer._suspended.set.assert_not_called()

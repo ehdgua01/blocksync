@@ -16,7 +16,7 @@ def mock_time(mocker):
 def stub_worker(mocker):
     worker = Worker(
         worker_id=1,
-        syncer=Mock(canceled=False),
+        syncer=Mock(canceled=False, suspended=False),
         startpos=0,
         endpos=5,
         dryrun=False,
@@ -73,15 +73,14 @@ def test_sync(stub_worker, mock_time):
             call(logging.INFO, "[Worker 1]: !!! Done !!!"),
         ]
     )
-
     stub_worker.syncer.hooks.run_after.assert_called_once_with(stub_worker.syncer.status)
 
 
 def test_sync_with_suspending(stub_worker):
-    stub_worker.syncer.suspended.is_set.return_value = False
+    stub_worker.syncer.suspended = True
     stub_worker._sync()
     stub_worker.logger.log.assert_has_calls([call(logging.INFO, "[Worker 1]: Suspending...")])
-    stub_worker.syncer.suspended.wait.assert_called()
+    stub_worker.syncer._suspended.wait.assert_called()
 
 
 def test_sync_with_canceling(stub_worker):

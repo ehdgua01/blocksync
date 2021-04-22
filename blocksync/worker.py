@@ -59,9 +59,9 @@ class Worker(threading.Thread):
                 self.syncer.src.get_blocks(self.syncer.status.block_size),
                 self.syncer.dest.get_blocks(self.syncer.status.block_size),
             ):
-                if not self.syncer.suspended.is_set():
+                if self.syncer.suspended:
                     self._log("Suspending...")
-                    self.syncer.suspended.wait()
+                    self.syncer._suspended.wait()
                 if self.syncer.canceled:
                     self._log("Synchronization task has been canceled")
                     return
