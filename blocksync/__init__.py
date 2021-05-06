@@ -1,4 +1,4 @@
-from blocksync.files import File, LocalFile, SFTPFile
-from blocksync.syncer import Syncer
+from blocksync.hooks import Hooks
+from blocksync.sync import local_to_local, local_to_remote, remote_to_local
 
-__all__ = ["File", "LocalFile", "SFTPFile", "Syncer"]
+__all__ = ["local_to_local", "local_to_remote", "remote_to_local", "Hooks"]
