@@ -4,12 +4,13 @@ import sys
 DIFF = b"2"
 COMPLEN = len(DIFF)
 path = sys.stdin.buffer.readline().strip()
-block_size = int(sys.stdin.buffer.readline())
+
 size = int(sys.stdin.buffer.readline())
 if size > 0:
     with open(path, "a+") as fileobj:
         fileobj.truncate(size)
 
+block_size = int(sys.stdin.buffer.readline())
 startpos = int(sys.stdin.buffer.readline())
 maxblock = int(sys.stdin.buffer.readline())
 

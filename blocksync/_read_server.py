@@ -7,13 +7,13 @@ from typing import Callable
 DIFF = b"2"
 COMPLEN = len(DIFF)
 path: bytes = sys.stdin.buffer.readline().strip()
-block_size: int = int(sys.stdin.buffer.readline())
-hash_: Callable = getattr(hashlib, sys.stdin.buffer.readline().strip().decode())
 
 fileobj = open(path, "rb")
 fileobj.seek(io.SEEK_SET, io.SEEK_END)
 print(fileobj.tell(), flush=True)
 
+block_size: int = int(sys.stdin.buffer.readline())
+hash_: Callable = getattr(hashlib, sys.stdin.buffer.readline().strip().decode())
 startpos: int = int(sys.stdin.buffer.readline())
 maxblock: int = int(sys.stdin.buffer.readline())
 
