@@ -6,11 +6,17 @@ __all__ = ["Hooks"]
 
 
 class Hooks:
-    def __init__(self):
-        self.before: Optional[Callable[[None], Any]] = None
-        self.after: Optional[Callable[[Status], Any]] = None
-        self.monitor: Optional[Callable[[Status], Any]] = None
-        self.on_error: Optional[Callable[[Status], Any]] = None
+    def __init__(
+        self,
+        on_before: Optional[Callable[..., Any]],
+        on_after: Optional[Callable[[Status], Any]],
+        monitor: Optional[Callable[[Status], Any]],
+        on_error: Optional[Callable[[Exception, Status], Any]],
+    ):
+        self.before: Optional[Callable[..., Any]] = on_before
+        self.after: Optional[Callable[[Status], Any]] = on_after
+        self.monitor: Optional[Callable[[Status], Any]] = monitor
+        self.on_error: Optional[Callable[[Exception, Status], Any]] = on_error
 
     def _run(self, hook: Optional[Callable], *args, **kwargs):
         if hook:

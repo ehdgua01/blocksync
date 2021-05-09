@@ -6,14 +6,14 @@ import threading
 import time
 import timeit
 from math import ceil
-from typing import IO, Generator, Optional, Tuple, Union
+from typing import IO, Any, Callable, Generator, Optional, Tuple, Union
 
 import paramiko
 
 from blocksync._consts import BASE_DIR, DIFF, SKIP, ByteSizes
+from blocksync._hooks import Hooks
 from blocksync._status import Status
 from blocksync._sync_manager import SyncManager
-from blocksync.hooks import Hooks
 
 __all__ = ["local_to_local", "local_to_remote", "remote_to_local"]
 
@@ -94,7 +94,10 @@ def local_to_local(
     create_dest: bool = False,
     wait: bool = False,
     dryrun: bool = False,
-    hooks: Optional[Hooks] = None,
+    on_before: Optional[Callable[..., Any]] = None,
+    on_after: Optional[Callable[[Status], Any]] = None,
+    monitor: Optional[Callable[[Status], Any]] = None,
+    on_error: Optional[Callable[[Exception, Status], Any]] = None,
     monitoring_interval: Union[int, float] = 1,
     sync_interval: Union[int, float] = 0,
 ) -> Tuple[Optional[SyncManager], Status]:
@@ -112,7 +115,7 @@ def local_to_local(
         "dest": dest,
         "status": status,
         "manager": manager,
-        "hooks": hooks,
+        "hooks": Hooks(on_before=on_before, on_after=on_after, monitor=monitor, on_error=on_error),
         "dryrun": dryrun,
         "monitoring_interval": monitoring_interval,
         "sync_interval": sync_interval,
@@ -134,16 +137,16 @@ def _local_to_local(
     dest: str,
     status: Status,
     manager: SyncManager,
-    hooks: Optional[Hooks],
+    hooks: Hooks,
     dryrun: bool,
     monitoring_interval: Union[int, float],
     sync_interval: Union[int, float],
 ):
-    if hooks:
-        hooks.run_before()
+    hooks.run_before()
 
     startpos, maxblock = _get_range(worker_id, status)
     _log(worker_id, f"Start sync({src} -> {dest}) {maxblock} blocks")
+
     srcdev = io.open(src, "rb+")
     destdev = io.open(dest, "rb+")
     srcdev.seek(startpos)
@@ -171,20 +174,17 @@ def _local_to_local(
                 status.add_block("same")
             t_cur = timeit.default_timer()
             if monitoring_interval <= t_cur - t_last:
-                if hooks:
-                    hooks.run_monitor(status)
+                hooks.run_monitor(status)
                 t_last = t_cur
             if sync_interval:
                 time.sleep(sync_interval)
     except Exception as e:
         _log(worker_id, msg=str(e), exc_info=True)
-        if hooks:
-            hooks.run_on_error(e, status)
+        hooks.run_on_error(e, status)
     finally:
         srcdev.close()
         destdev.close()
-    if hooks:
-        hooks.run_after(status)
+    hooks.run_after(status)
 
 
 def local_to_remote(
@@ -195,7 +195,10 @@ def local_to_remote(
     create_dest: bool = False,
     wait: bool = False,
     dryrun: bool = False,
-    hooks: Optional[Hooks] = None,
+    on_before: Optional[Callable[..., Any]] = None,
+    on_after: Optional[Callable[[Status], Any]] = None,
+    monitor: Optional[Callable[[Status], Any]] = None,
+    on_error: Optional[Callable[[Exception, Status], Any]] = None,
     monitoring_interval: Union[int, float] = 1,
     sync_interval: Union[int, float] = 0,
     hash1: str = "sha256",
@@ -227,7 +230,7 @@ def local_to_remote(
         "manager": manager,
         "create_dest": create_dest,
         "dryrun": dryrun,
-        "hooks": hooks,
+        "hooks": Hooks(on_before=on_before, on_after=on_after, monitor=monitor, on_error=on_error),
         "monitoring_interval": monitoring_interval,
         "sync_interval": sync_interval,
         "hash1": hash1,
@@ -254,13 +257,15 @@ def _local_to_remote(
     manager: SyncManager,
     create_dest: bool,
     dryrun: bool,
-    hooks: Optional[Hooks],
+    hooks: Hooks,
     monitoring_interval: Union[int, float],
     sync_interval: Union[int, float],
     hash1: str,
     read_server_command: str,
     write_server_command: str,
 ):
+    hooks.run_before()
+
     hash_ = getattr(hashlib, hash1)
     hash_len = hash_().digest_size * 2
     reader_stdin, reader_stdout, _ = ssh.exec_command(read_server_command)
@@ -268,7 +273,10 @@ def _local_to_remote(
     writer_stdin.write(f"{dest}\n{status.src_size if create_dest else 0}\n")
     reader_stdin.write(f"{dest}\n")
     status.dest_size = int(reader_stdout.readline())
+
     startpos, maxblock = _get_range(worker_id, status)
+    _log(worker_id, f"Start sync({src} -> {dest}) {maxblock} blocks")
+
     reader_stdin.write(f"{status.block_size}\n{hash1}\n{startpos}\n{maxblock}\n")
     writer_stdin.write(f"{status.block_size}\n{startpos}\n{maxblock}\n")
     t_last = timeit.default_timer()
@@ -296,22 +304,19 @@ def _local_to_remote(
                     status.add_block("same")
                 t_cur = timeit.default_timer()
                 if monitoring_interval <= t_cur - t_last:
-                    if hooks:
-                        hooks.run_monitor(status)
+                    hooks.run_monitor(status)
                     t_last = t_cur
                 if sync_interval:
                     time.sleep(sync_interval)
         except Exception as e:
             _log(worker_id, msg=str(e), exc_info=True)
-            if hooks:
-                hooks.run_on_error(e, status)
+            hooks.run_on_error(e, status)
         finally:
             reader_stdin.close()
             reader_stdout.close()
             writer_stdin.close()
             writer_stdout.close()
-        if hooks:
-            hooks.run_after(status)
+        hooks.run_after(status)
 
 
 def remote_to_local(
@@ -322,7 +327,10 @@ def remote_to_local(
     create_dest: bool = False,
     wait: bool = False,
     dryrun: bool = False,
-    hooks: Optional[Hooks] = None,
+    on_before: Optional[Callable[..., Any]] = None,
+    on_after: Optional[Callable[[Status], Any]] = None,
+    monitor: Optional[Callable[[Status], Any]] = None,
+    on_error: Optional[Callable[[Exception, Status], Any]] = None,
     monitoring_interval: Union[int, float] = 1,
     sync_interval: Union[int, float] = 0,
     hash1: str = "sha256",
@@ -351,7 +359,7 @@ def remote_to_local(
         "status": status,
         "manager": manager,
         "dryrun": dryrun,
-        "hooks": hooks,
+        "hooks": Hooks(on_before=on_before, on_after=on_after, monitor=monitor, on_error=on_error),
         "monitoring_interval": monitoring_interval,
         "sync_interval": sync_interval,
         "hash1": hash1,
@@ -380,15 +388,20 @@ def _remote_to_local(
     sync_interval: Union[int, float],
     hash1: str,
     read_server_command: str,
-    hooks: Optional[Hooks],
+    hooks: Hooks,
 ):
+    hooks.run_before()
+
     hash_ = getattr(hashlib, hash1)
     hash_len = hash_().digest_size * 2
     reader_stdin, _, _ = ssh.exec_command(read_server_command)
     reader_stdout = reader_stdin.channel.makefile("rb")
     reader_stdin.write(f"{src}\n")
     reader_stdout.readline()
+
     startpos, maxblock = _get_range(worker_id, status)
+    _log(worker_id, f"Start sync({src} -> {dest}) {maxblock} blocks")
+
     reader_stdin.write(f"{status.block_size}\n{hash1}\n{startpos}\n{maxblock}\n")
     t_last = timeit.default_timer()
     with open(dest, "rb+") as fileobj:
@@ -417,17 +430,14 @@ def _remote_to_local(
                     status.add_block("same")
                 t_cur = timeit.default_timer()
                 if monitoring_interval <= t_cur - t_last:
-                    if hooks:
-                        hooks.run_monitor(status)
+                    hooks.run_monitor(status)
                     t_last = t_cur
                 if sync_interval:
                     time.sleep(sync_interval)
         except Exception as e:
             _log(worker_id, msg=str(e), exc_info=True)
-            if hooks:
-                hooks.run_on_error(e, status)
+            hooks.run_on_error(e, status)
         finally:
             reader_stdin.close()
             reader_stdout.close()
-        if hooks:
-            hooks.run_after(status)
+        hooks.run_after(status)
