@@ -36,7 +36,7 @@ When sync from/to remote, you can check the SSH connection options in [paramiko 
 ```python
 from blocksync import local_to_local
 
-manager, status = local_to_local("src.txt", "dest.txt")
+manager, status = local_to_local("src.txt", "dest.txt", workers=4)
 manager.wait_sync()
 print(status)
 
