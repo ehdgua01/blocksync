@@ -10,7 +10,7 @@ DIFF: str = "2"
 
 
 class ByteSizes:
-    BLOCK_SIZE_PATTERN = re.compile("([0-9]+)(.+)")
+    BLOCK_SIZE_PATTERN = re.compile("([0-9]+)(B|KB|MB|GB|KiB|K|MiB|M|GiB|G)")
 
     B: int = 1
     KB: int = 1000
