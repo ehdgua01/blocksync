@@ -1,4 +1,3 @@
-import base64
 import hashlib
 import io
 import logging
@@ -106,6 +105,7 @@ def local_to_local(
         block_size=_get_block_size(block_size),
         src_size=_get_size(src),
     )
+
     if create_dest:
         _do_create(dest, status.src_size)
     status.dest_size = _get_size(dest)
@@ -146,11 +146,11 @@ def _local_to_local(
 
     startpos, maxblock = _get_range(worker_id, status)
     _log(worker_id, f"Start sync({src} -> {dest}) {maxblock} blocks")
-
     srcdev = io.open(src, "rb+")
     destdev = io.open(dest, "rb+")
     srcdev.seek(startpos)
     destdev.seek(startpos)
+
     t_last = timeit.default_timer()
     try:
         for src_block, dest_block, _ in zip(
@@ -163,20 +163,21 @@ def _local_to_local(
                 manager._wait_resuming()
             if manager.canceled:
                 break
+
             if src_block != dest_block:
                 if not dryrun:
-                    offset = min(len(src_block), status.block_size)
-                    destdev.seek(-offset, io.SEEK_CUR)
+                    destdev.seek(-len(src_block), io.SEEK_CUR)
                     srcdev.write(src_block)
                     destdev.flush()
                 status.add_block("diff")
             else:
                 status.add_block("same")
+
             t_cur = timeit.default_timer()
             if monitoring_interval <= t_cur - t_last:
                 hooks.run_monitor(status)
                 t_last = t_cur
-            if sync_interval:
+            if 0 < sync_interval:
                 time.sleep(sync_interval)
     except Exception as e:
         _log(worker_id, msg=str(e), exc_info=True)
@@ -210,9 +211,10 @@ def local_to_remote(
 ) -> Tuple[Optional[SyncManager], Status]:
     status: Status = Status(
         workers=workers,
-        block_size=(ByteSizes.parse_readable_byte_size(block_size) if isinstance(block_size, str) else block_size),
+        block_size=ByteSizes.parse_readable_byte_size(block_size) if isinstance(block_size, str) else block_size,
         src_size=_get_size(src),
     )
+
     ssh = _connect_ssh(allow_load_system_host_keys, compress, **ssh_config)
     if sftp := ssh.open_sftp():
         if read_server_command is None:
@@ -221,6 +223,7 @@ def local_to_remote(
         if write_server_command is None:
             sftp.put(DEFAULT_WRITE_SERVER_SCRIPT_PATH, WRITE_SERVER_SCRIPT_NAME)
             write_server_command = f"python3 {WRITE_SERVER_SCRIPT_NAME}"
+
     manager = SyncManager()
     kwargs = {
         "ssh": ssh,
@@ -264,21 +267,21 @@ def _local_to_remote(
     read_server_command: str,
     write_server_command: str,
 ):
+    hash_ = getattr(hashlib, hash1)
+    hash_len = hash_().digest_size
+
     hooks.run_before()
 
-    hash_ = getattr(hashlib, hash1)
-    hash_len = hash_().digest_size * 2
     reader_stdin, reader_stdout, _ = ssh.exec_command(read_server_command)
     writer_stdin, writer_stdout, _ = ssh.exec_command(write_server_command)
     writer_stdin.write(f"{dest}\n{status.src_size if create_dest else 0}\n")
     reader_stdin.write(f"{dest}\n")
     status.dest_size = int(reader_stdout.readline())
-
     startpos, maxblock = _get_range(worker_id, status)
     _log(worker_id, f"Start sync({src} -> {dest}) {maxblock} blocks")
-
     reader_stdin.write(f"{status.block_size}\n{hash1}\n{startpos}\n{maxblock}\n")
     writer_stdin.write(f"{status.block_size}\n{startpos}\n{maxblock}\n")
+
     t_last = timeit.default_timer()
     with open(src, "rb+") as fileobj:
         fileobj.seek(startpos)
@@ -289,24 +292,25 @@ def _local_to_remote(
                     manager._wait_resuming()
                 if manager.canceled:
                     break
-                src_block_hash: str = hash_(src_block).hexdigest()
-                dest_block_hash: str = reader_stdout.read(hash_len).decode()
+
+                src_block_hash: bytes = hash_(src_block).digest()
+                dest_block_hash: bytes = reader_stdout.read(hash_len)
+                reader_stdin.write(SKIP)
                 if src_block_hash != dest_block_hash:
-                    reader_stdin.write(SKIP)
                     if not dryrun:
                         writer_stdin.write(DIFF)
-                        writer_stdin.write(f"{len(src_block)}\n")
                         writer_stdin.write(src_block)
                     else:
                         writer_stdin.write(SKIP)
                     status.add_block("diff")
                 else:
                     status.add_block("same")
+
                 t_cur = timeit.default_timer()
                 if monitoring_interval <= t_cur - t_last:
                     hooks.run_monitor(status)
                     t_last = t_cur
-                if sync_interval:
+                if 0 < sync_interval:
                     time.sleep(sync_interval)
         except Exception as e:
             _log(worker_id, msg=str(e), exc_info=True)
@@ -343,6 +347,7 @@ def remote_to_local(
     if read_server_command is None and (sftp := ssh.open_sftp()):
         sftp.put(DEFAULT_READ_SERVER_SCRIPT_PATH, READ_SERVER_SCRIPT_NAME)
         read_server_command = f"python3 {READ_SERVER_SCRIPT_NAME}"
+
     status = Status(
         workers=workers,
         block_size=(ByteSizes.parse_readable_byte_size(block_size) if isinstance(block_size, str) else block_size),
@@ -390,19 +395,19 @@ def _remote_to_local(
     read_server_command: str,
     hooks: Hooks,
 ):
+    hash_ = getattr(hashlib, hash1)
+    hash_len = hash_().digest_size
+
     hooks.run_before()
 
-    hash_ = getattr(hashlib, hash1)
-    hash_len = hash_().digest_size * 2
     reader_stdin, _, _ = ssh.exec_command(read_server_command)
     reader_stdout = reader_stdin.channel.makefile("rb")
     reader_stdin.write(f"{src}\n")
     reader_stdout.readline()
-
     startpos, maxblock = _get_range(worker_id, status)
     _log(worker_id, f"Start sync({src} -> {dest}) {maxblock} blocks")
-
     reader_stdin.write(f"{status.block_size}\n{hash1}\n{startpos}\n{maxblock}\n")
+
     t_last = timeit.default_timer()
     with open(dest, "rb+") as fileobj:
         fileobj.seek(startpos)
@@ -413,26 +418,28 @@ def _remote_to_local(
                     manager._wait_resuming()
                 if manager.canceled:
                     break
-                src_block_hash: str = reader_stdout.read(hash_len).decode()
-                dest_block_hash: str = hash_(dest_block).hexdigest()
+
+                src_block_hash: bytes = reader_stdout.read(hash_len)
+                dest_block_hash: bytes = hash_(dest_block).digest()
                 if src_block_hash != dest_block_hash:
                     if not dryrun:
                         reader_stdin.write(DIFF)
-                        src_block = base64.b85decode(reader_stdout.readlines(-1)[0])
-                        offset = min(len(src_block), status.block_size)
-                        fileobj.seek(-offset, io.SEEK_CUR)
+                        src_block = reader_stdout.read(status.block_size)
+                        fileobj.seek(-len(src_block), io.SEEK_CUR)
                         fileobj.write(src_block)
                         fileobj.flush()
                     else:
                         reader_stdin.write(SKIP)
                     status.add_block("diff")
                 else:
+                    reader_stdin.write(SKIP)
                     status.add_block("same")
+
                 t_cur = timeit.default_timer()
                 if monitoring_interval <= t_cur - t_last:
                     hooks.run_monitor(status)
                     t_last = t_cur
-                if sync_interval:
+                if 0 < sync_interval:
                     time.sleep(sync_interval)
         except Exception as e:
             _log(worker_id, msg=str(e), exc_info=True)

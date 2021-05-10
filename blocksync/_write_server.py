@@ -3,23 +3,23 @@ import sys
 
 DIFF = b"2"
 COMPLEN = len(DIFF)
-path = sys.stdin.buffer.readline().strip()
+stdin = sys.stdin.buffer
 
-size = int(sys.stdin.buffer.readline())
+path = stdin.readline().strip()
+
+size = int(stdin.readline())
 if size > 0:
     with open(path, "a+") as fileobj:
         fileobj.truncate(size)
 
-block_size = int(sys.stdin.buffer.readline())
-startpos = int(sys.stdin.buffer.readline())
-maxblock = int(sys.stdin.buffer.readline())
+block_size = int(stdin.readline())
+startpos = int(stdin.readline())
+maxblock = int(stdin.readline())
 
 with open(path, mode="rb+") as f:
     f.seek(startpos)
     for _ in range(maxblock):
-        if sys.stdin.buffer.read(COMPLEN) == DIFF:
-            current_block_size: int = int(sys.stdin.buffer.readline())
-            diff = sys.stdin.buffer.read(current_block_size)
-            f.write(diff)
+        if stdin.read(COMPLEN) == DIFF:
+            f.write(stdin.read(block_size))
         else:
             f.seek(block_size, io.SEEK_CUR)
