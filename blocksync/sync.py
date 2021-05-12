@@ -5,7 +5,7 @@ import threading
 import time
 import timeit
 from math import ceil
-from typing import IO, Any, Callable, Generator, Optional, Tuple, Union
+from typing import IO, Any, Callable, Dict, Generator, Optional, Tuple, Union
 
 import paramiko
 
@@ -85,6 +85,25 @@ def _connect_ssh(
     return ssh
 
 
+def _sync(
+    manager: SyncManager,
+    status: Status,
+    workers: int,
+    sync: Callable,
+    sync_options: Dict[str, Any],
+    wait: bool = False,
+) -> Tuple[Optional[SyncManager], Status]:
+    for i in range(1, workers + 1):
+        sync_options["worker_id"] = i
+        worker = threading.Thread(target=sync, kwargs=sync_options)
+        worker.start()
+        manager.workers.append(worker)
+    if wait:
+        manager.wait_sync()
+        return None, status
+    return manager, status
+
+
 def local_to_local(
     src: str,
     dest: str,
@@ -105,12 +124,11 @@ def local_to_local(
         block_size=_get_block_size(block_size),
         src_size=_get_size(src),
     )
-
     if create_dest:
         _do_create(dest, status.src_size)
     status.dest_size = _get_size(dest)
     manager = SyncManager()
-    kwargs = {
+    sync_options = {
         "src": src,
         "dest": dest,
         "status": status,
@@ -120,15 +138,7 @@ def local_to_local(
         "monitoring_interval": monitoring_interval,
         "sync_interval": sync_interval,
     }
-    for i in range(1, workers + 1):
-        kwargs["worker_id"] = i
-        worker = threading.Thread(target=_local_to_local, kwargs=kwargs)
-        worker.start()
-        manager.workers.append(worker)
-    if wait:
-        manager.wait_sync()
-        return None, status
-    return manager, status
+    return _sync(manager, status, workers, _local_to_local, sync_options, wait)
 
 
 def _local_to_local(
@@ -225,7 +235,7 @@ def local_to_remote(
             write_server_command = f"python3 {WRITE_SERVER_SCRIPT_NAME}"
 
     manager = SyncManager()
-    kwargs = {
+    sync_options = {
         "ssh": ssh,
         "src": src,
         "dest": dest,
@@ -240,15 +250,7 @@ def local_to_remote(
         "read_server_command": read_server_command,
         "write_server_command": write_server_command,
     }
-    for i in range(1, workers + 1):
-        kwargs["worker_id"] = i
-        worker = threading.Thread(target=_local_to_remote, kwargs=kwargs)
-        worker.start()
-        manager.workers.append(worker)
-    if wait:
-        manager.wait_sync()
-        return None, status
-    return manager, status
+    return _sync(manager, status, workers, _local_to_remote, sync_options, wait)
 
 
 def _local_to_remote(
@@ -350,14 +352,14 @@ def remote_to_local(
 
     status = Status(
         workers=workers,
-        block_size=(ByteSizes.parse_readable_byte_size(block_size) if isinstance(block_size, str) else block_size),
+        block_size=ByteSizes.parse_readable_byte_size(block_size) if isinstance(block_size, str) else block_size,
         src_size=_get_remotedev_size(ssh, read_server_command, src),  # type: ignore[arg-type]
     )
     if create_dest:
         _do_create(dest, status.src_size)
     status.dest_size = _get_size(dest)
     manager = SyncManager()
-    kwargs = {
+    sync_options = {
         "ssh": ssh,
         "src": src,
         "dest": dest,
@@ -370,15 +372,7 @@ def remote_to_local(
         "hash1": hash1,
         "read_server_command": read_server_command,
     }
-    for i in range(1, workers + 1):
-        kwargs["worker_id"] = i
-        worker = threading.Thread(target=_remote_to_local, kwargs=kwargs)
-        worker.start()
-        manager.workers.append(worker)
-    if wait:
-        manager.wait_sync()
-        return None, status
-    return manager, status
+    return _sync(manager, status, workers, _remote_to_local, sync_options, wait)
 
 
 def _remote_to_local(
