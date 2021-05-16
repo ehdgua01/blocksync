@@ -221,7 +221,7 @@ def local_to_remote(
 ) -> Tuple[Optional[SyncManager], Status]:
     status: Status = Status(
         workers=workers,
-        block_size=ByteSizes.parse_readable_byte_size(block_size) if isinstance(block_size, str) else block_size,
+        block_size=_get_block_size(block_size),
         src_size=_get_size(src),
     )
 
