@@ -36,12 +36,17 @@ When sync from/to remote, you can check the SSH connection options in [paramiko 
 ```python
 from blocksync import local_to_local
 
+
 manager, status = local_to_local("src.txt", "dest.txt", workers=4)
 manager.wait_sync()
 print(status)
 
 # Output
-{'workers': 1, 'chunk_size': 251, 'block_size': 1048576, 'src_size': 1007, 'dest_size': 1007, 'blocks': {'same': 4, 'diff': 0, 'done': 4}}
+[Worker 1]: Start sync(src.txt -> dest.txt) 1 blocks
+[Worker 2]: Start sync(src.txt -> dest.txt) 1 blocks
+[Worker 3]: Start sync(src.txt -> dest.txt) 1 blocks
+[Worker 4]: Start sync(src.txt -> dest.txt) 1 blocks
+{'workers': 4, 'chunk_size': 250, 'block_size': 250, 'src_size': 1000, 'dest_size': 1000, 'blocks': {'same': 4, 'diff': 0, 'done': 4}}
 ```
 
 
