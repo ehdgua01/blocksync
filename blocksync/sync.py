@@ -68,7 +68,7 @@ def _get_blocks(fileobj: IO, block_size: int) -> Generator[bytes, None, None]:
         yield block
 
 
-def _log(worker_id: int, msg: str, level: int = logger.level, *args, **kwargs):
+def _log(worker_id: int, msg: str, level: int = logging.INFO, *args, **kwargs):
     logger.log(level, f"[Worker {worker_id}]: {msg}", *args, **kwargs)
 
 
