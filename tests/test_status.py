@@ -3,13 +3,8 @@ from blocksync._status import Blocks
 
 
 def test_initialize_status(fake_status):
-    # Expect: Initialize all status
-    assert fake_status.workers == 1
-    assert fake_status.chunk_size == 1_000
-    assert fake_status.block_size == 1_000
-    assert fake_status.src_size == 1_000
-    assert fake_status.dest_size == 1_000
-    assert fake_status.blocks == Blocks(same=0, diff=0, done=0)
+    # Expect: Set chunk size
+    assert fake_status.chunk_size == fake_status.src_size // fake_status.workers
 
 
 def test_add_block(fake_status):
