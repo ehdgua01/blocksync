@@ -49,13 +49,13 @@ def _get_size(path: str) -> int:
 
 
 def _get_remotedev_size(ssh: paramiko.SSHClient, command: str, path: str) -> int:
-    reader_stdin, reader_stdout, _ = ssh.exec_command(command)
+    stdin, stdout, _ = ssh.exec_command(command)
     try:
-        reader_stdin.write(f"{path}\n")
-        return int(reader_stdout.readline())
+        stdin.write(f"{path}\n")
+        return int(stdout.readline())
     finally:
-        reader_stdout.close()
-        reader_stdin.close()
+        stdout.close()
+        stdin.close()
 
 
 def _do_create(path: str, size: int):
