@@ -4,7 +4,6 @@ Blocksync Python package allows [blocksync script](https://github.com/theraser/b
 and supports more convenient and various functions than blocksync script.
 
 [![Build](https://img.shields.io/travis/ehdgua01/blocksync/master.svg?style=for-the-badge&logo=travis)](https://travis-ci.com/github/ehdgua01/blocksync)
-[![Coverage](https://img.shields.io/codecov/c/github/ehdgua01/blocksync?logo=codecov&style=for-the-badge)](https://app.codecov.io/gh/ehdgua01/blocksync)
 [![PyPi](https://img.shields.io/pypi/v/blocksync?logo=pypi&style=for-the-badge)](https://pypi.org/project/blocksync/)
 [![PyVersions](https://img.shields.io/pypi/pyversions/blocksync?logo=python&style=for-the-badge)](https://pypi.org/project/blocksync/)
 
