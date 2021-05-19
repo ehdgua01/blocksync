@@ -1,6 +1,6 @@
 # blocksync
 
-Blocksync Python package allows [blocksync script](https://github.com/theraser/blocksync) to be used as Python packages,
+This library allows [blocksync script](https://github.com/theraser/blocksync) to be used as Python package,
 and supports more convenient and various functions than blocksync script.
 
 [![Build](https://img.shields.io/travis/ehdgua01/blocksync/master.svg?style=for-the-badge&logo=travis)](https://travis-ci.com/github/ehdgua01/blocksync)
