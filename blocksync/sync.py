@@ -169,7 +169,7 @@ def _local_to_local(
             range(maxblock),
         ):
             if manager.suspended:
-                _log(worker_id, "Wait resuming...")
+                _log(worker_id, "Waiting for resume...")
                 manager._wait_resuming()
             if manager.canceled:
                 break
@@ -290,7 +290,7 @@ def _local_to_remote(
         try:
             for src_block, _ in zip(_get_blocks(fileobj, status.block_size), range(maxblock)):
                 if manager.suspended:
-                    _log(worker_id, "Wait resuming...")
+                    _log(worker_id, "Waiting for resume...")
                     manager._wait_resuming()
                 if manager.canceled:
                     break
@@ -408,7 +408,7 @@ def _remote_to_local(
         try:
             for dest_block, _ in zip(_get_blocks(fileobj, status.block_size), range(maxblock)):
                 if manager.suspended:
-                    _log(worker_id, "Wait resuming...")
+                    _log(worker_id, "Waiting for resume...")
                     manager._wait_resuming()
                 if manager.canceled:
                     break
