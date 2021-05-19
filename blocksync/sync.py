@@ -394,7 +394,7 @@ def _remote_to_local(
 
     hooks.run_before()
 
-    reader_stdin, _, _ = ssh.exec_command(read_server_command)
+    reader_stdin, *_ = ssh.exec_command(read_server_command)
     reader_stdout = reader_stdin.channel.makefile("rb")
     reader_stdin.write(f"{src}\n")
     reader_stdout.readline()
