@@ -30,7 +30,7 @@ pip install blocksync
 
 # Quick start
 
-When sync from/to remote, you can check the SSH connection options in [paramiko docs](http://docs.paramiko.org/en/stable/api/client.html#paramiko.client.SSHClient).
+- local - local
 
 ```python
 from blocksync import local_to_local
@@ -48,6 +48,25 @@ print(status)
 {'workers': 4, 'chunk_size': 250, 'block_size': 250, 'src_size': 1000, 'dest_size': 1000, 'blocks': {'same': 4, 'diff': 0, 'done': 4}}
 ```
 
+- local - remote
+
+When sync from(or to) remote, you can check the SSH connection options in [paramiko docs](http://docs.paramiko.org/en/stable/api/client.html#paramiko.client.SSHClient).
+
+```python
+from blocksync import local_to_remote
+
+
+manager, status = local_to_remote(
+    "src.txt",
+    "dest.txt",
+    workers=4,
+    hostname="hostname",
+    username="username",
+    password="password",
+    key_filename="key_filepath",
+)
+manager.wait_sync()
+```
 
 # TODO
 - [ ] Provide CLI
