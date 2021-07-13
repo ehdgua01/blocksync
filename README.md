@@ -4,9 +4,9 @@ This library allows [blocksync script](https://github.com/theraser/blocksync) to
 and supports more convenient and various functions than blocksync script.
 
 [![Open in Visual Studio Code](https://open.vscode.dev/badges/open-in-vscode.svg)](https://open.vscode.dev/ehdgua01/blocksync)
-[![Build](https://img.shields.io/travis/ehdgua01/blocksync/master.svg?style=for-the-badge&logo=travis)](https://travis-ci.com/github/ehdgua01/blocksync)
-[![PyPi](https://img.shields.io/pypi/v/blocksync?logo=pypi&style=for-the-badge)](https://pypi.org/project/blocksync/)
-[![PyVersions](https://img.shields.io/pypi/pyversions/blocksync?logo=python&style=for-the-badge)](https://pypi.org/project/blocksync/)
+[![Build](https://img.shields.io/travis/ehdgua01/blocksync/master.svg?style=flat&logo=travis)](https://travis-ci.com/github/ehdgua01/blocksync)
+[![PyPi](https://img.shields.io/pypi/v/blocksync?logo=pypi&style=flat)](https://pypi.org/project/blocksync/)
+[![PyVersions](https://img.shields.io/pypi/pyversions/blocksync?style=flat&logo=python)](https://pypi.org/project/blocksync/)
 
 # Prerequisites
 
