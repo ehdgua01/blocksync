@@ -22,3 +22,4 @@ def test_read_server(source_file, source_content, pytester):
 
     stdin.write(b"2")
     assert stdout.read(len(source_content)) == source_content
+print("test")
